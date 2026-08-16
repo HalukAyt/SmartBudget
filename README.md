@@ -2,7 +2,7 @@
 
 SmartBudget AI, kullanıcıların gelir, gider, kategori bütçesi ve ev faturalarını (elektrik, su, doğalgaz) tek bir mobil uygulamada takip edebildiği bir kişisel/aile bütçe uygulamasıdır. Backend, kategori önerisi ve aylık harcama yorumu için kontrollü biçimde bir AI (LLM) servisinden yararlanır; ancak finansal hesaplamaların tek doğruluk kaynağı her zaman backend'dir — AI hiçbir zaman toplam, yüzde veya bakiye hesaplamaz.
 
-Bu proje, `PROJECT.md`'nin source-of-truth kabul edildiği, her görevin numaralandırılmış bir `prompts/NN_*.txt` dosyasıyla verildiği ve `docs/AI_CALISMA_GUNLUGU.md` içinde insan tarafından incelenip kayıt altına alındığı, prompt-driven / insan denetimli bir AI geliştirme sürecinin ürünüdür.
+Bu proje, `PROJECT.md` dosyasının projenin **tek doğruluk kaynağı (source of truth)** olarak kabul edildiği, her görevin numaralandırılmış bir `prompts/NN_*.txt` dosyasıyla verildiği ve `docs/AI_CALISMA_GUNLUGU.md` içinde insan tarafından incelenip kayıt altına alındığı, prompt-driven / insan denetimli bir AI geliştirme sürecinin ürünüdür.
 
 ## Teknoloji Yığını
 
@@ -35,7 +35,7 @@ SmartBudget/
 │  └─ test/
 ├─ docs/                          # ANALIZ.md, TEKNIK_MIMARI_TASLAK.md, AI_CALISMA_GUNLUGU.md, DESIGN.md,
 │                                    KULLANICI_KILAVUZU.md, DEMO_SENARYOSU.md, FINAL_AUDIT.md
-├─ prompts/                       # Numaralandırılmış görev promptları (00 → 37)
+├─ prompts/                       # Numaralandırılmış görev promptları (00 → 40)
 ├─ docker-compose.yml             # PostgreSQL + backend API için local evaluation topology
 ├─ .env.example                   # Docker ortam değişkeni şablonu (placeholder, gerçek secret içermez)
 └─ PROJECT.md                     # Projenin kaynak-of-truth context dosyası
@@ -259,3 +259,14 @@ flutter build apk --debug
 - AI çıktıları güvenilmeyen veri olarak ele alınır: kategori önerisi sabit bir whitelist ile, aylık analiz metni ise teknik alan adı/JSON/`null` sızıntısına karşı backend tarafında doğrulanır; geçersiz/şüpheli çıktı kullanıcıya aynen gösterilmez.
 - Production ortamında API hata yanıtlarında stack trace veya iç altyapı bilgisi gösterilmez.
 - Docker Compose ile çalıştırırken PostgreSQL parolası, JWT anahtarı ve OpenAI API anahtarı yalnızca `.env` dosyası üzerinden environment variable olarak geçirilir; hiçbir gerçek secret `docker-compose.yml`, `Dockerfile` veya `.env.example` içine yazılmaz. `.env` `.gitignore` içinde hariç tutulmuştur ve container loglarına secret basılmaz.
+
+
+
+## Son Doğrulama
+
+- Backend: **292/292 test başarılı**
+- Flutter: **161/161 test başarılı**
+- `flutter analyze`: **No issues found**
+- Docker Compose smoke test: **başarılı**
+- PostgreSQL container: **healthy**
+- API container: **healthy**
