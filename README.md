@@ -35,7 +35,7 @@ SmartBudget/
 │  └─ test/
 ├─ docs/                          # ANALIZ.md, TEKNIK_MIMARI_TASLAK.md, AI_CALISMA_GUNLUGU.md, DESIGN.md,
 │                                    KULLANICI_KILAVUZU.md, DEMO_SENARYOSU.md, FINAL_AUDIT.md
-├─ prompts/                       # Numaralandırılmış görev promptları (00 → 41)
+├─ prompts/                       # Numaralandırılmış görev promptları (00 → 42)
 ├─ docker-compose.yml             # PostgreSQL + backend API için local evaluation topology
 ├─ .env.example                   # Docker ortam değişkeni şablonu (placeholder, gerçek secret içermez)
 └─ PROJECT.md                     # Projenin kaynak-of-truth context dosyası
@@ -265,7 +265,7 @@ flutter build apk --debug
 ## Son Doğrulama
 
 - Backend: **292/292 test başarılı**
-- Flutter: **161/161 test başarılı**
+- Flutter: **167/167 test başarılı**
 - `flutter analyze`: **No issues found**
 - Docker Compose smoke test: **başarılı**
 - PostgreSQL container: **healthy**
