@@ -1,0 +1,237 @@
+Bu görev SmartBudget AI recurring finansal kayıtlarındaki gerçek bir due-date bug fix'idir.
+
+Yeni feature geliştirme.
+Migration oluşturma.
+Background scheduler mimarisini değiştirme.
+Gereksiz refactor yapma.
+
+Önce oku:
+
+- PROJECT.md
+- prompts/34_recurring_financial_records.txt
+- prompts/35_recurring_auto_realization.txt
+- prompts/36_recurring_midnight_scheduler_revision.txt
+- prompts/39_recurring_create_immediate_due_fix.txt
+- RecurringRuleService
+- RecurrenceDateHelper
+- ilgili recurring testleri
+
+## Manuel Testte Bulunan Bug
+
+Bugün:
+
+2026-08-16 Europe/Istanbul
+
+Kullanıcı recurring Income oluşturuyor:
+
+StartDate = 2026-08-17
+Amount = örneğin 45.000
+
+Beklenen:
+
+Bu gelir bugün gerçekleşmemeli.
+Dashboard / Balance bugün değişmemeli.
+
+Gerçek davranış:
+
+Kural oluşturulur oluşturulmaz actual Income oluşuyor ve Dashboard bakiyesi hemen artıyor.
+
+Bu hatalıdır.
+
+## Kök Problem
+
+Immediate realization / due kontrolü current month seviyesinde fazla geniş davranıyor olabilir.
+
+Aynı ay içinde olması tek başına yeterli değildir.
+
+OccurrenceDate bugünden ilerideyse rule henüz due değildir.
+
+## Doğru Due Kuralı
+
+Europe/Istanbul currentDate kullan.
+
+Belirli year/month için:
+
+occurrenceDate = RecurrenceDateHelper.GetOccurrenceDate(StartDate, year, month)
+
+Current month için otomatik realization yalnızca:
+
+currentDate >= occurrenceDate
+
+ise yapılabilir.
+
+Yani:
+
+Bugün 16 Ağustos
+StartDate.Day = 17
+
+occurrenceDate = 17 Ağustos
+
+16 >= 17 false
+
+=> REALIZE ETME.
+
+Bugün 16 Ağustos
+StartDate.Day = 16
+
+=> due, realize edilebilir.
+
+Bugün 16 Ağustos
+StartDate.Day = 5
+
+=> geçmiş due, occurrence yoksa current-month catch-up olarak realize edilebilir.
+
+## Future StartDate
+
+Kuralın gerçek StartDate'i gelecekteyse ayrıca kesinlikle realize etme.
+
+Örnek:
+
+Today = 2026-08-16
+StartDate = 2026-09-05
+
+=> bekle.
+
+Today = 2026-08-16
+StartDate = 2026-08-17
+
+=> bekle.
+
+## 29/30/31
+
+Mevcut short-month clamp davranışını koru.
+
+Örnek:
+
+StartDate.Day = 31
+
+Şubat occurrenceDate = ayın son günü.
+
+Due kararı bu hesaplanmış occurrenceDate üzerinden verilmeli.
+
+## Immediate Create-Time Realization
+
+Prompt 39'daki create-time immediate realization korunacak.
+
+Ama yalnız gerçekten due olan rule için çalışacak.
+
+Future-day rule create edildiğinde:
+
+- RecurringFinancialRule oluşur
+- RecurringOccurrence oluşmaz
+- actual Income/Expense/Bill oluşmaz
+- response IsRealizedForCurrentMonth=false olmalı
+- NextDueDate doğru future date olmalı
+
+## Background Scheduler
+
+Aynı bug automatic scheduler yolunda da olmamalı.
+
+RunAutomaticRealizationAsync / TryAutoRealizeAsync aynı due helper'ı kullanmalı.
+
+Business rule tek yerde olmalı.
+
+Create-time ve scheduler için farklı due mantığı yazma.
+
+## Income
+
+Yarın başlayacak Income bugün Dashboard'u etkilememeli.
+
+## Expense
+
+Yarın başlayacak Expense bugün Expense/Budget/Dashboard'u etkilememeli.
+
+## Fixed Bill
+
+Yarın başlayacak fixed Bill bugün Bill veya linked Expense oluşturmamalı.
+
+## Unknown Amount Bill
+
+Mevcut davranış değişmesin.
+
+## Tests
+
+En az:
+
+1. Today=2026-08-16, StartDate=2026-08-17 Income create -> actual Income yok.
+2. Aynı senaryoda occurrence yok.
+3. Dashboard değişmiyor.
+4. Response IsRealizedForCurrentMonth=false.
+5. NextDueDate=2026-08-17.
+6. Today=16, StartDate=16 -> hemen realize.
+7. Today=16, StartDate=5 -> current-month catch-up realize.
+8. Expense future-day -> realize edilmez.
+9. Fixed Bill future-day -> realize edilmez.
+10. Scheduler future-day rule'u erken realize etmez.
+11. Scheduler gerçek due güne geldiğinde realize eder.
+12. 31-day clamp due comparison doğru çalışır.
+13. Europe/Istanbul UTC boundary doğru çalışır.
+14. Mevcut duplicate protection bozulmaz.
+15. Existing recurring testlerin tamamı geçer.
+
+## Flutter
+
+Bu bug backend business logic bug'ıdır.
+
+Flutter'da due hesabı ekleme.
+
+Backend response doğru olduktan sonra mevcut UI yeterliyse Flutter kodunu değiştirme.
+
+## Smoke Test
+
+Docker/PostgreSQL üzerinde:
+
+Today Europe/Istanbul = current date.
+
+1. Future start date = tomorrow olan recurring Income oluştur.
+2. Container restart YAPMA.
+3. Actual Income oluşmadığını doğrula.
+4. Dashboard değişmediğini doğrula.
+5. Occurrence oluşmadığını doğrula.
+6. Response nextDueDate'in yarını gösterdiğini doğrula.
+7. Bugün due başka bir recurring Income oluştur.
+8. Bunun hemen gerçekleştiğini doğrula.
+9. Test verilerini temizle.
+
+## AI Log
+
+docs/AI_CALISMA_GUNLUGU.md içine yeni gerçek bug entry'si ekle.
+
+Açıkça yaz:
+
+- prompt 39 sonrası manual testte future StartDate rule'un erken realize edildiği insan tarafından fark edildi
+- root cause due comparison'ın current-month seviyesinde fazla geniş olmasıydı
+- occurrenceDate <= currentDate kuralına düzeltildi
+- regression tests eklendi
+- smoke sonucu
+
+## Final Doğrulama
+
+dotnet build
+dotnet test
+
+Flutter değiştiyse:
+flutter analyze
+flutter test
+
+Docker smoke çalıştır.
+
+## İş Bitiminde Raporla
+
+1. Bug
+2. Kök neden
+3. Due-date fix
+4. Immediate realization'a etkisi
+5. Scheduler'a etkisi
+6. Income/Expense/Bill davranışı
+7. Response alanları
+8. Değiştirilen dosyalar
+9. Migration
+10. Backend test sonucu
+11. Flutter test sonucu (çalıştıysa)
+12. Docker smoke sonucu
+13. Future StartDate'in artık erken gerçekleşmediğinin kanıtı
+14. Bugün due rule'un hâlâ hemen gerçekleştiğinin kanıtı
+15. AI log entry numarası
+
+Scope'u büyütme.

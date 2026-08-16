@@ -1,0 +1,495 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Bu dosyalar projenin source of truth dokümanlarıdır.
+
+SmartBudget AI projesinde yalnızca AI destekli aylık finansal analiz özelliğini geliştir.
+
+Mevcut Authentication/JWT, Category, Expense, Income, Budget, Bill, Dashboard ve AI Expense Categorization yapıları korunmalıdır.
+
+Bu aşamada Flutter geliştirmesine geçme.
+
+## Amaç
+
+Backend tarafından deterministik olarak hesaplanmış aylık finansal verileri AI'a vererek
+kullanıcıya kısa, anlaşılır ve kontrollü bir aylık harcama yorumu üretmek.
+
+AI finansal hesaplama yapmamalıdır.
+
+AI yalnızca backend tarafından hesaplanan verileri yorumlamalıdır.
+
+## Çok Önemli Temel Kural
+
+AI'a ham veriyi verip:
+
+- toplam gelir,
+- toplam gider,
+- bakiye,
+- kategori toplamı,
+- yüzde,
+- bütçe kullanım oranı,
+- önceki ay değişimi,
+- en yüksek harcama kategorisi,
+- en fazla artış gösteren kategori
+
+hesaplatma.
+
+Bu değerler DashboardService tarafından önceden hesaplanmalıdır.
+
+AI yalnızca verilen değerleri açıklamalıdır.
+
+## Yapılacaklar
+
+1. AI aylık analiz DTO'larını oluştur.
+
+En az:
+
+- MonthlyAnalysisRequest
+- MonthlyAnalysisResponse
+- internal/raw AI analysis response modeli
+
+oluştur.
+
+MonthlyAnalysisRequest yalnızca raporlama dönemi seçimi için gerekli alanları içermelidir.
+
+Tercihen:
+
+- Year nullable
+- Month nullable
+
+Kurallar:
+
+- UserId request içinde bulunmamalıdır.
+- year/month davranışı mevcut Dashboard endpointiyle tutarlı olmalıdır.
+- İkisi de verilmezse Europe/Istanbul mevcut ayı kullanılmalıdır.
+- Biri verilip diğeri verilmezse 400.
+- Month 1–12.
+- Year 2000–2100.
+
+2. MonthlyAnalysisResponse aşağıdaki semantiği taşımalıdır:
+
+- Success
+- Year
+- Month
+- Analysis
+- RequiresManualReview veya eşdeğer kontrollü durum alanı gerekliyse sade biçimde kullanılabilir
+- Message
+
+Analysis başarısız durumda nullable olabilir.
+
+Response:
+
+- ham provider response'u,
+- promptu,
+- secret'ı,
+- stack trace'i
+
+içermemelidir.
+
+3. Mevcut DashboardService'i veri kaynağı olarak kullan.
+
+AI aylık analiz servisi finansal metrikleri kendi başına tekrar hesaplamamalıdır.
+
+Akış:
+
+Authenticated UserId
+    ↓
+DashboardService
+    ↓
+MonthlyDashboardResponse
+    ↓
+AI Monthly Analysis Service
+    ↓
+LLM
+    ↓
+Kontrollü yorum response'u
+
+Mevcut DashboardService sorgularını kopyalayıp paralel finansal hesaplama sistemi oluşturma.
+
+4. AI'a gönderilecek veriyi minimize et.
+
+Mümkün olduğunca yalnızca backend tarafından hesaplanmış özet veriler gönder.
+
+Örneğin:
+
+- Year
+- Month
+- TotalIncome
+- TotalExpense
+- Balance
+- kategori bazlı gider özetleri
+- budget usage özetleri
+- PreviousMonthExpenseChangePercent
+- HighestSpendingCategory
+- HighestIncreaseCategory
+
+gibi hesaplanmış değerler kullanılabilir.
+
+Ham:
+
+- kullanıcı email'i,
+- JWT,
+- UserId,
+- password bilgileri,
+- tüm transaction kayıtları,
+- gereksiz Expense Description listeleri
+
+AI'a gönderilmemelidir.
+
+5. AI monthly analysis promptunu kontrollü oluştur.
+
+AI'a açık şekilde şu kuralları ver:
+
+- Sana verilen finansal değerleri yeniden hesaplama.
+- Sana verilen rakamları değiştirme.
+- Olmayan veri üretme.
+- Eksik veriyi tahmin etme.
+- Kullanıcıya yatırım tavsiyesi verme.
+- Hisse, kripto, fon veya başka yatırım ürünü önerme.
+- Para transferi veya ödeme talimatı verme.
+- Kullanıcıya sadece mevcut verilerde dikkat çeken noktaları açıkla.
+- Harcamanın hangi kategoride yoğunlaştığını söyleyebilirsin.
+- Geçen aya göre artışı yalnızca verilen veriye göre yorumla.
+- Bütçe aşımı veya limite yaklaşma varsa bunu açıkla.
+- Suçlayıcı, korkutucu veya aşırı kesin dil kullanma.
+- Yanıt kısa ve anlaşılır Türkçe olmalıdır.
+- Kullanıcının finansal geleceği hakkında tahmin yapma.
+- Sistemde olmayan rakam üretme.
+
+6. AI çıktısı mümkün olduğunca yapılandırılmış olsun.
+
+Basit bir schema kullanılabilir.
+
+Örneğin:
+
+{
+  "analysis": "Bu ay..."
+}
+
+Gereksiz karmaşık JSON yapısı oluşturma.
+
+AI output'u strict structured output destekleniyorsa kullan.
+
+Ancak provider çıktısını yine de backend tarafında doğrula.
+
+7. AiMonthlyAnalysisService oluştur.
+
+Sorumlulukları:
+
+- Request period validation
+- authenticatedUserId ile DashboardService çağırma
+- AI'a gönderilecek minimum summary oluşturma
+- LLM client çağrısı
+- raw response parse/doğrulama
+- finansal güvenlik kontrolleri
+- kontrollü fallback response üretme
+
+Controller içine prompt veya business logic koyma.
+
+8. Mevcut OpenAI configuration/client yaklaşımını mümkün olduğunca yeniden kullan.
+
+Ancak kategorileme ve aylık analiz prompt/response sorumluluklarını karıştırma.
+
+Gerekirse mevcut OpenAI client yapısında küçük ve kontrollü refactor yap.
+
+Ama:
+
+- çoklu provider abstraction,
+- plugin sistemi,
+- gereksiz generic AI framework
+
+oluşturma.
+
+9. Model/configuration
+
+Mevcut AI configuration yapısını kullan.
+
+AI API key mevcut secret yaklaşımından okunmalıdır.
+
+Yeni bir ikinci API key sistemi oluşturma.
+
+Model configuration üzerinden değiştirilebilir kalmalıdır.
+
+10. Aylık analiz endpointini ekle.
+
+Endpoint:
+
+POST /api/ai/monthly-summary
+
+Authentication zorunludur.
+
+Örnek request:
+
+{}
+
+→ mevcut Europe/Istanbul ayı.
+
+veya:
+
+{
+  "year": 2026,
+  "month": 8
+}
+
+Controller:
+
+- CurrentUserAccessor ile authenticated kullanıcıyı belirlemeli,
+- request'i service'e iletmeli,
+- kontrollü DTO dönmeli.
+
+Request'ten UserId alma.
+
+11. AI success davranışı
+
+AI geçerli analiz ürettiğinde:
+
+- Success = true
+- Year/Month doğru dönem
+- Analysis = doğrulanmış analiz metni
+
+dön.
+
+AI'ın verdiği metni backend finansal hesaplarının yerine kullanma.
+
+12. AI failure/fallback davranışı
+
+Aşağıdaki durumlarda uygulama çökmemelidir:
+
+- AI timeout
+- HTTP/provider hatası
+- boş response
+- parse edilemeyen response
+- analysis alanı eksik
+- analysis boş
+- beklenmeyen provider response
+- configuration eksikliği
+
+Bu durumlarda:
+
+- Success = false
+- Analysis = null
+- uygun Message
+- Dashboard verileri etkilenmeden kalır
+
+şeklinde kontrollü response dön.
+
+AI servis hatası Dashboard endpointini veya diğer CRUD işlevlerini bozmaz.
+
+13. AI output doğrulaması
+
+AI tarafından dönen analiz metnini güvenilir kabul etme.
+
+En az şu kontrolleri uygula:
+
+- null değil
+- whitespace değil
+- makul bir maksimum uzunluk sınırı
+- raw JSON/provider envelope değil
+- beklenen response alanından geliyor
+
+Aşırı karmaşık doğal dil güvenlik filtresi yazma.
+
+Ancak açık şekilde yasaklanan davranışları azaltmak için prompt + output kontrol yaklaşımı kullan.
+
+14. Finansal halüsinasyon riskini azalt.
+
+AI'a verilen summary verilerinin JSON/structured formda açık şekilde ayrılmasını sağla.
+
+Promptta:
+
+"Yalnızca aşağıdaki verileri kullan"
+
+kuralı bulunmalıdır.
+
+AI'dan rakam üretmesini isteme.
+
+Mümkünse AI response'unda yeni sayısal hesap üretme ihtiyacını azalt.
+
+15. Yatırım tavsiyesi sınırı
+
+AI aylık analiz:
+
+- yatırım tavsiyesi veremez,
+- hisse/kripto/fon öneremez,
+- "şunu satın al", "şuna yatırım yap" gibi yönlendirme yapamaz.
+
+Bu davranış promptta açıkça yasaklanmalıdır.
+
+Testlerde de doğrulanabilir.
+
+16. Boş veri davranışı
+
+Seçilen ayda:
+
+TotalIncome = 0
+TotalExpense = 0
+
+ve anlamlı finansal veri yoksa gereksiz AI çağrısı yapmamayı değerlendir.
+
+Bu durumda deterministik bir response üretmek tercih edilir.
+
+Örneğin semantik olarak:
+
+- Success = true
+- Analysis = "Bu ay için henüz yeterli finansal veri bulunmuyor."
+
+Bu mesaj backend tarafından üretilebilir.
+
+AI'a boş veri gönderip uydurma yorum oluşturmasına izin verme.
+
+17. Bütçe ve kategori yorumu
+
+AI yalnızca DashboardService tarafından sağlanan bilgiler üzerinden:
+
+- en fazla harcama yapılan kategori,
+- en fazla artan kategori,
+- Warning durumundaki bütçeler,
+- Exceeded durumundaki bütçeler,
+- geçen aya göre gider değişimi
+
+hakkında yorum yapabilir.
+
+AI'ın bu değerleri tekrar hesaplamasına izin verme.
+
+18. Loglama ve gizlilik
+
+AI aylık analiz sırasında:
+
+- UserId loglama,
+- JWT loglama,
+- API key loglama,
+- gereksiz ham finansal kayıt loglama,
+- raw AI response'u production ortamında kullanıcı verisiyle birlikte loglama.
+
+Güvenli teknik hata loglaması kullanılabilir.
+
+19. Testler oluştur.
+
+Gerçek OpenAI ağına bağımlı unit test oluşturma.
+
+Mock/fake client yaklaşımı kullan.
+
+En az aşağıdaki davranışları test et:
+
+Period:
+- year/month yok → Europe/Istanbul mevcut ay
+- ikisi birlikte verilirse seçilen ay
+- yalnızca year → 400
+- yalnızca month → 400
+- month 0 → 400
+- month 13 → 400
+- year 1999 → 400
+- year 2101 → 400
+
+Dashboard integration:
+- authenticated user id DashboardService'e doğru iletiliyor
+- AI service kendi finansal toplamlarını hesaplamıyor
+- Dashboard sonucu AI inputunun kaynağı oluyor
+
+Data minimization:
+- UserId AI payload'a gitmiyor
+- Email AI payload'a gitmiyor
+- JWT gitmiyor
+- Password/hash gitmiyor
+- ham Expense entity listesi gitmiyor
+
+AI success:
+- geçerli structured response → Success true
+- analiz metni doğru dönüyor
+- Year/Month korunuyor
+
+Empty data:
+- gelir ve gider yokken AI çağrısı yapılmıyor
+- kontrollü "yeterli veri yok" analizi dönüyor
+- AI bu durumda veri uyduramıyor
+
+Fallback:
+- timeout → kontrollü failure
+- HTTP hata → kontrollü failure
+- boş response → kontrollü failure
+- invalid JSON → kontrollü failure
+- analysis eksik → controlled failure
+- analysis whitespace → controlled failure
+
+Security:
+- prompt rakamları değiştirmemeyi açıkça söylüyor
+- prompt yatırım tavsiyesini yasaklıyor
+- prompt olmayan veri üretmeyi yasaklıyor
+- prompt sadece verilen summary verisini kullanmayı söylüyor
+- raw provider response client'a açılmıyor
+- API key response'a eklenmiyor
+
+Isolation:
+- AI monthly summary endpointi Expense/Income/Budget/Bill tablolarını değiştirmiyor
+- SaveChanges çağrısı yapmıyor
+
+Controller:
+- authentication zorunlu
+- request DTO'da UserId yok
+- response DTO kullanılıyor
+
+20. Mevcut tüm testleri çalıştır.
+
+Mevcut:
+
+- Authentication
+- Category/Expense
+- Income
+- Budget
+- Bill/Trend
+- Dashboard
+- AI kategorileme
+
+testleri geçmeye devam etmelidir.
+
+21. Build ve testleri çalıştır.
+
+## Çok Önemli Kurallar
+
+- PROJECT.md, ANALIZ.md ve TEKNIK_MIMARI_TASLAK.md ile çelişme.
+- AI'a finansal hesap yaptırma.
+- DashboardService hesaplarını tekrar AI service içinde yazma.
+- Ham transaction verilerini gereksiz şekilde AI'a gönderme.
+- UserId, email, JWT, password veya password hash'i AI'a gönderme.
+- AI'ın rakamları değiştirmesine izin verme.
+- AI'ın olmayan veri üretmesini kabul etme.
+- AI yatırım tavsiyesi vermemeli.
+- AI hata verdiğinde Dashboard'u bozma.
+- AI response'u database'e kaydetme.
+- Finansal entity'leri AI endpointinden değiştirme.
+- Flutter geliştirme.
+- Yeni CRUD özelliği ekleme.
+- Generic Repository ekleme.
+- Unit of Work ekleme.
+- CQRS ekleme.
+- MediatR ekleme.
+- Microservice oluşturma.
+- Çoklu provider AI framework oluşturma.
+- API key'i repository'ye yazma.
+- Source-of-truth dokümanlarını kendiliğinden değiştirme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen dosyalar
+2. MonthlyAnalysis request/response DTO yapısı
+3. DashboardService entegrasyonu
+4. AI'a gönderilen veri özeti
+5. Veri minimizasyonu yaklaşımı
+6. Prompt kuralları
+7. Structured output/response doğrulaması
+8. Boş veri davranışı
+9. Timeout/fallback davranışı
+10. Finansal halüsinasyon riskine karşı kontroller
+11. Yatırım tavsiyesi sınırı
+12. API key/secret yönetimi
+13. Endpoint davranışı
+14. Database değişmezliği
+15. Oluşturulan testler
+16. Build sonucu
+17. Toplam test sonucu
+18. Önceki test gruplarının durumu
+19. Bilerek geliştirilmemiş özellikler
+20. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

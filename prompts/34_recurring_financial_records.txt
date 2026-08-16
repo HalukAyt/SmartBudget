@@ -1,0 +1,784 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut backend ve Flutter implementasyonunu incele.
+
+Bu görev SmartBudget AI uygulamasına periyodik / tekrar eden finansal kayıt desteği eklemek içindir.
+
+Amaç:
+- Income
+- Expense
+- Bill
+
+kayıtlarının tek seferlik veya aylık periyodik olarak planlanabilmesini sağlamak.
+
+Bu görevde kapsam kontrollü tutulmalıdır.
+
+Yeni büyük architecture pattern ekleme.
+Repository/UoW/CQRS/MediatR ekleme.
+Yeni state management package ekleme.
+Yeni AI feature ekleme.
+
+# Domain Kararı
+
+Periyodik kayıt sistemi gerçek finansal kayıtlarla recurrence kuralını ayırmalıdır.
+
+Gerçekleşmiş finansal kayıtlar mevcut tablolarında kalmalıdır:
+
+- Income
+- Expense
+- Bill
+
+Periyodik davranış ayrı bir recurrence/template yapısıyla yönetilmelidir.
+
+Gelecek aylara otomatik olarak "gerçekleşmiş" finansal kayıt yazma.
+
+Özellikle tahmini fatura tutarlarını gerçekleşmiş gider gibi Dashboard'a dahil etme.
+
+---
+
+# 1. Recurring Rule Modeli
+
+Backend'de ayrı bir recurring rule/entity tasarla.
+
+Örneğin:
+
+RecurringFinancialRule
+
+Alanlar minimum olarak:
+
+- Id : Guid
+- UserId : Guid
+- RecordType : Income / Expense / Bill
+- Frequency : Monthly
+- StartDate
+- EndDate
+- IsActive
+- CreatedAt
+
+RecordType'a göre gerekli template alanları da bulunmalıdır.
+
+Income için:
+- Amount
+- Description nullable
+
+Expense için:
+- Amount
+- CategoryId
+- Description nullable
+
+Bill için:
+- BillType
+- Amount nullable veya gerçek tutar bilinmiyorsa null
+- ConsumptionValue kesinlikle geleceğe varsayılan olarak üretme
+
+Ancak mevcut domain ihtiyaçlarını inceleyerek daha temiz bir model gerekiyorsa onu uygula.
+
+Tek bir dev JSON/string alanında business data saklama.
+
+---
+
+# 2. MVP Frequency
+
+Bu görevde yalnızca:
+
+Monthly
+
+destekle.
+
+Şunları ekleme:
+
+- weekly
+- daily
+- bi-weekly
+- yearly
+- cron expression
+
+Kapsam büyütme.
+
+---
+
+# 3. Süre Seçenekleri
+
+Flutter UI'da kullanıcı periyodik seçtiğinde şu seçenekleri görebilmeli:
+
+- 3 Ay
+- 6 Ay
+- 12 Ay
+- Bitiş Tarihi
+
+Varsayılan:
+
+6 Ay
+
+olmalıdır.
+
+Kullanıcı custom bitiş tarihi seçerse StartDate'den önce olamaz.
+
+MVP Year sınırı mevcut sistemdeki 2000-2100 yaklaşımıyla uyumlu olmalıdır.
+
+---
+
+# 4. Tek Seferlik / Periyodik
+
+Income, Expense ve Bill oluşturma ekranlarında:
+
+Tekrarlama
+
+alanı bulunmalıdır.
+
+Seçenekler:
+
+- Tek seferlik
+- Her ay
+
+Varsayılan:
+
+Tek seferlik
+
+olmalıdır.
+
+Mevcut kullanıcıların normal create akışı değişmeden çalışmalıdır.
+
+---
+
+# 5. Periyodik Income
+
+Örnek:
+
+Maaş
+45.000 TL
+Her ay
+6 Ay
+
+Bu bir recurring income rule oluşturmalıdır.
+
+Çok önemli:
+
+Gelecek 6 ayın Income kayıtlarını tek seferde "gerçekleşmiş gelir" olarak oluşturma.
+
+Recurring rule planı temsil etmelidir.
+
+Sadece zamanı geldiğinde / kullanıcı onayladığında gerçek Income oluşmalıdır.
+
+---
+
+# 6. Periyodik Expense
+
+Örnek:
+
+Kira
+20.000 TL
+Kategori: Kira
+Her ay
+12 Ay
+
+Recurring expense rule oluştur.
+
+Gelecek aylara gerçek Expense kayıtları yaratma.
+
+Böylece Dashboard bugünden gelecekteki harcamaları TotalExpense'a dahil etmez.
+
+---
+
+# 7. Periyodik Bill
+
+Bill tarafı özellikle dikkatli tasarlanmalıdır.
+
+Elektrik / Su / Doğalgaz faturaları değişken tutarlı olabilir.
+
+Bu nedenle periyodik Bill:
+
+"Her ay elektrik faturası bekleniyor"
+
+şeklinde bir plan oluşturabilir.
+
+Gelecek ay için:
+- sahte Bill oluşturma
+- 0 TL Bill oluşturma
+- tahmini Expense oluşturma
+- Dashboard'a gider yazma
+
+yapma.
+
+Kullanıcı gerçek fatura geldiğinde:
+
+- Amount
+- gerekiyorsa ConsumptionValue
+
+girip bunu gerçek Bill olarak oluşturmalıdır.
+
+Gerçek Bill oluşturulduğunda mevcut Bill -> Expense sync davranışı aynen çalışmalıdır.
+
+---
+
+# 8. Planlanan vs Gerçekleşen
+
+Recurring rule planlanan kaydı temsil etmelidir.
+
+Gerçek finansal kayıt ayrı kalmalıdır.
+
+Planlanan ve gerçekleşen veriyi birbirine karıştırma.
+
+Kullanıcı ilgili ay için gerçek kayıt oluşturduğunda recurring rule bozulmamalıdır.
+
+Mümkünse rule'dan "bu ay için kaydı oluştur" aksiyonu tasarlanabilir.
+
+Ancak gereksiz karmaşık scheduler/job sistemi ekleme.
+
+---
+
+# 9. Scheduler Yaklaşımı
+
+Bu MVP'de background Windows service / Hangfire / Quartz / cloud scheduler ekleme.
+
+Recurring kayıtların otomatik backend job ile yaratılması zorunlu değildir.
+
+Tercih edilen sade yaklaşım:
+
+Backend recurring rule'ları saklar.
+
+Flutter ilgili ay geldiğinde kullanıcıya planlanan kayıtları gösterebilir.
+
+Kullanıcı:
+
+"Bu ay için oluştur"
+
+dediğinde gerçek Income/Expense/Bill oluşturulur.
+
+Bu yaklaşım:
+- yanlış gelecek kayıt üretmez
+- MVP'yi sade tutar
+- finansal doğruluğu korur
+
+---
+
+# 10. Planned Records Endpoint
+
+Mevcut architecture'a uygun minimum endpointler ekle.
+
+Örneğin:
+
+GET /api/recurring-rules
+POST /api/recurring-rules
+PUT /api/recurring-rules/{id}
+DELETE /api/recurring-rules/{id}
+
+Ve gerekiyorsa:
+
+GET /api/recurring-rules/due
+
+ile mevcut aya ait aktif recurring planları döndür.
+
+Endpoint isimlerini mevcut API naming convention'a göre netleştir.
+
+Kullanıcı yalnız kendi rule'larını görebilmelidir.
+
+UserId request body'den gelmemelidir.
+
+---
+
+# 11. Due Mantığı
+
+Bir recurring rule mevcut ay için due sayılmalıdır eğer:
+
+- IsActive = true
+- StartDate ilgili aydan önce veya aynı ayda
+- EndDate ilgili aydan sonra veya aynı ayda
+
+Monthly recurrence için gün seviyesinde aşırı karmaşık hesap yapma.
+
+Europe/Istanbul timezone yaklaşımını koru.
+
+---
+
+# 12. Duplicate Gerçekleşme Koruması
+
+Aynı recurring rule için aynı ayda ikinci kez gerçek kayıt oluşturulmamalıdır.
+
+Örneğin kullanıcı:
+
+"Bu ay için oluştur"
+
+butonuna iki kez basarsa duplicate Income/Expense/Bill oluşmamalıdır.
+
+Bunun için ayrı bir occurrence/realization tablosu kullanılabilir.
+
+Örneğin:
+
+RecurringOccurrence
+
+- Id
+- RecurringRuleId
+- UserId
+- Year
+- Month
+- CreatedRecordId
+- RecordType
+- CreatedAt
+
+User + Rule + Year + Month unique olmalıdır.
+
+Bu yaklaşım tercih edilir.
+
+Duplicate kontrol yalnız UI'ya bırakılmamalıdır.
+
+---
+
+# 13. Realize Endpoint
+
+Mümkünse tek bir endpoint:
+
+POST /api/recurring-rules/{id}/realize
+
+Request:
+
+- year
+- month
+- Bill ise gerçek amount zorunlu olabilir
+- Bill consumption optional olabilir
+
+Income/Expense için rule'daki Amount kullanılabilir.
+
+Bill için Amount recurring rule'da bilinmiyorsa realize sırasında kullanıcıdan gerçek Amount alınmalıdır.
+
+Realize sonucunda:
+
+Income rule -> Income oluştur
+Expense rule -> Expense oluştur
+Bill rule -> Bill oluştur
+
+Bill realize:
+- mevcut BillService/business logic kullanılmalı
+- Bill -> Expense otomatik sync korunmalı
+
+Business logic'i duplicate etme.
+
+---
+
+# 14. Bill Recurring Amount
+
+Bill recurring rule için Amount iki şekilde yönetilebilir:
+
+Tercih edilen MVP yaklaşımı:
+
+- Bill recurring rule Amount nullable
+- eğer kullanıcı sabit bir fatura planı girmek isterse amount template değeri olabilir
+- gerçek kayıt oluştururken kullanıcı amount'u doğrulayıp değiştirebilir
+
+Ancak recurring template amount'u Dashboard'a hiçbir zaman otomatik gider olarak yansıtma.
+
+---
+
+# 15. Edit Rule
+
+Recurring rule düzenlenebilmeli.
+
+Minimum editable alanlar:
+
+- IsActive
+- EndDate
+- Amount/template amount
+- Description
+- CategoryId (Expense ise)
+- BillType (Bill ise)
+
+Geçmiş gerçekleşmiş finansal kayıtları retroaktif değiştirme.
+
+Rule edit yalnız gelecekteki occurrences için geçerli olmalıdır.
+
+---
+
+# 16. Delete Rule
+
+Rule silindiğinde:
+
+- geçmiş Income/Expense/Bill gerçek kayıtlarını silme
+- geçmiş occurrences'ı koru veya referential integrity gereği cascade davranışını güvenli tasarla
+
+Tercihen recurring rule hard-delete yerine mevcut architecture uygunsa delete edilebilir, ancak gerçekleşmiş finansal kayıtlar bağımsız kalmalıdır.
+
+Geçmiş finansal veriyi kaybetme.
+
+---
+
+# 17. Flutter UI — Create Forms
+
+Income Add form:
+- Tek seferlik / Her ay
+- Her ay seçilirse süre seçenekleri
+
+Expense Add form:
+- Tek seferlik / Her ay
+- Her ay seçilirse süre seçenekleri
+
+Bill Add form:
+- Tek seferlik / Her ay
+- Her ay seçilirse süre seçenekleri
+
+Tek seferlik seçiliyken mevcut request akışı değişmemelidir.
+
+Periyodik seçiliyken normal POST create yerine recurring rule oluştur.
+
+---
+
+# 18. Flutter UI — Planlananlar
+
+İşlemler veya uygun bir bölümde sade bir:
+
+"Planlananlar"
+
+alanı ekle.
+
+Büyük yeni navigation tab ekleme.
+
+Mümkünse İşlemler ekranında ayrı filter/tab:
+
+- Tümü
+- Giderler
+- Gelirler
+- Planlananlar
+
+kullanılabilir.
+
+Bill recurring planları da burada veya Faturalar ekranında planlanan olarak gösterilebilir.
+
+UI kararını mevcut DESIGN.md ile uyumlu ve minimum değişiklikle uygula.
+
+---
+
+# 19. Due Item Görünümü
+
+Planlanan kayıtta kullanıcı şunları görebilmeli:
+
+- tür
+- açıklama
+- kategori/type
+- aylık amount/template amount
+- başlangıç
+- bitiş
+- aktif/pasif
+- bu ay gerçekleşti mi
+
+Bu ay gerçekleşmediyse:
+
+"Bu Ay İçin Oluştur"
+
+aksiyonu gösterilebilir.
+
+Gerçekleştiyse tekrar oluşturma butonu disabled/gizli olmalıdır.
+
+---
+
+# 20. Bill Due UX
+
+Bill recurring planında kullanıcı "Bu Ay İçin Oluştur" dediğinde:
+
+Amount input aç.
+
+Örneğin:
+
+Elektrik faturası
+Planlanan
+Ağustos 2026
+
+Gerçek Tutar
+[          ]
+
+Tüketim
+[ optional ]
+
+Kaydet
+
+Realize çağrısı başarılı olunca:
+- Bill oluşur
+- Expense otomatik oluşur
+- Dashboard refresh olur
+- Bill trend refresh olur
+- plan occurrence completed olur
+
+---
+
+# 21. Income/Expense Due UX
+
+Income veya Expense rule için:
+
+"Bu Ay İçin Oluştur"
+
+dendiğinde rule Amount kullanılabilir.
+
+İstersen kullanıcıya confirmation göster.
+
+Yeni modal/form gereksiz karmaşık olmamalıdır.
+
+---
+
+# 22. Dashboard
+
+Recurring rule / planned record:
+
+Dashboard TotalIncome
+Dashboard TotalExpense
+Balance
+
+hesaplarına DAHİL OLMAMALIDIR.
+
+Sadece gerçekleşmiş Income/Expense kayıtları Dashboard'a girer.
+
+Bu çok önemli.
+
+Planlanan vs gerçekleşen ayrımını koru.
+
+---
+
+# 23. Budget
+
+Recurring Expense rule henüz realize edilmediyse:
+
+Budget SpentAmount'a dahil olmamalıdır.
+
+Realize edilip Expense oluşturulduğunda normal mevcut Budget hesaplamasına dahil olur.
+
+Bill recurring rule realize edildiğinde bağlı Fatura Expense nedeniyle Fatura budget'a doğal olarak dahil olur.
+
+---
+
+# 24. Security
+
+Mevcut kuralları koru:
+
+- UserId JWT'den
+- request body'den UserId alma
+- IDOR -> 404
+- kullanıcı yalnız kendi recurring rule ve occurrence kayıtlarına erişebilir
+- başka kullanıcı realize/edit/delete yapamaz
+
+---
+
+# 25. Database
+
+Guid PK kullan.
+
+CreatedAt UTC.
+
+Month/year occurrence unique constraint kullan.
+
+Amount numeric(18,2).
+
+Date alanlarını mevcut DateOnly yaklaşımıyla uyumlu tut.
+
+Gerekli EF Core migration oluştur.
+
+Mevcut datayı silme/resetleme.
+
+---
+
+# 26. Validation
+
+Income/Expense recurring Amount:
+- > 0
+
+Bill realize Amount:
+- > 0
+
+Bill ConsumptionValue:
+- null veya > 0
+
+StartDate:
+- valid
+
+EndDate:
+- StartDate'den önce olamaz
+
+Duration:
+- 3/6/12 ay veya custom end date
+
+RecordType'a ait olmayan field kombinasyonlarını reddet.
+
+---
+
+# 27. Flutter Auto Refresh
+
+Realize başarılı olduktan sonra ilgili state'ler güncellenmelidir.
+
+Income realize:
+- Transactions refresh
+- Dashboard refresh
+
+Expense realize:
+- Transactions refresh
+- Dashboard refresh
+- Budget state gerekiyorsa refresh
+
+Bill realize:
+- Bills refresh
+- Bill trend refresh
+- Transactions refresh
+- Dashboard refresh
+- Fatura budget etkisi için mevcut backend kaynaklı değerlerin yenilenmesi
+
+Financial calculations Flutter'da yapılmamalıdır.
+
+---
+
+# 28. Tests — Backend
+
+En az:
+
+1. Income recurring rule create.
+2. Expense recurring rule create.
+3. Bill recurring rule create.
+4. 3 ay duration doğru EndDate.
+5. 6 ay duration doğru EndDate.
+6. 12 ay duration doğru EndDate.
+7. Custom end date validation.
+8. User ownership.
+9. due query yalnız aktif ve tarih aralığındaki rule'ları döndürür.
+10. Income realize gerçek Income oluşturur.
+11. Expense realize gerçek Expense oluşturur.
+12. Bill realize gerçek Bill oluşturur.
+13. Bill realize bağlı Expense oluşturur.
+14. Aynı rule aynı ay ikinci realize -> 409.
+15. Başka user realize -> 404.
+16. Planned rule Dashboard totals'a dahil olmaz.
+17. Realize sonrası Dashboard'a dahil olur.
+18. Planned Expense Budget SpentAmount'a dahil olmaz.
+19. Realize Expense Budget SpentAmount'a dahil olur.
+20. Rule edit geçmiş gerçek kaydı değiştirmez.
+21. Rule delete geçmiş gerçek kaydı silmez.
+22. Bill trend yalnız realize edilmiş Bill'i kullanır.
+23. Bill nullable amount/template davranışı.
+24. validation senaryoları.
+25. unique occurrence database constraint.
+
+---
+
+# 29. Tests — Flutter
+
+En az:
+
+1. Create Income: Tek seferlik -> mevcut endpoint.
+2. Create Income: Her ay -> recurring endpoint.
+3. Expense aynı davranış.
+4. Bill aynı davranış.
+5. Default duration 6 ay.
+6. 3/6/12 seçimleri.
+7. custom end date.
+8. Planlananlar listesi.
+9. Due Income realize.
+10. Due Expense realize.
+11. Due Bill realize amount formu.
+12. Duplicate realized item yeniden oluşturulamıyor.
+13. Realize success dashboard refresh.
+14. Bill realize bills/trend refresh.
+15. backend failure form state'i korur.
+16. loading/double submit protection.
+17. normal existing create flows bozulmaz.
+
+---
+
+# 30. Manual Emulator Test
+
+İş bitiminde manuel test için şu akışları raporla:
+
+A. Maaş
+- Her ay
+- 45.000
+- 6 ay
+- Planlananlar'da görünür
+- Dashboard henüz değişmez
+- Bu Ay İçin Oluştur
+- Dashboard income artar
+- ikinci kez oluşturulamaz
+
+B. Kira
+- Her ay
+- 20.000
+- 12 ay
+- planlanan rule oluştur
+- Dashboard hemen değişmez
+- realize
+- Expense ve Budget güncellenir
+
+C. Elektrik
+- Her ay
+- amount template olmadan veya nullable
+- planlanan görünür
+- Dashboard değişmez
+- realize sırasında gerçek tutar + consumption gir
+- Bill oluşur
+- bağlı Expense oluşur
+- Dashboard artar
+- trend güncellenir
+
+---
+
+# 31. Yapma
+
+- future records'i gerçekleşmiş gibi topluca oluşturma
+- fake 0 TL Bill oluşturma
+- future Bill amount tahmini
+- AI prediction
+- background scheduler/Hangfire/Quartz
+- weekly/daily recurrence
+- Dashboard'a planned amount dahil etme
+- Budget spent'e planned amount dahil etme
+- repository/UoW/CQRS/MediatR
+- yeni state management package
+- production deployment
+- premium/subscription
+
+---
+
+# 32. Final Doğrulama
+
+Backend:
+
+dotnet build
+dotnet test
+
+Migration:
+
+dotnet ef database update
+
+Flutter:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+---
+
+# İş Bitiminde Raporla
+
+1. Recurring domain modeli
+2. RecurringRule ve occurrence yapısı
+3. Migration adı
+4. Income recurrence davranışı
+5. Expense recurrence davranışı
+6. Bill recurrence davranışı
+7. 3/6/12/custom duration
+8. Default 6 ay davranışı
+9. Due query
+10. Realize endpoint
+11. Duplicate monthly realization protection
+12. Dashboard planned-vs-realized ayrımı
+13. Budget planned-vs-realized ayrımı
+14. Bill -> Expense sync entegrasyonu
+15. Flutter create form değişiklikleri
+16. Planlananlar UI
+17. Dashboard refresh davranışı
+18. Security/ownership
+19. Backend test sonucu
+20. Flutter test sonucu
+21. flutter analyze sonucu
+22. APK build sonucu
+23. Development PostgreSQL migration sonucu
+24. Manuel emulator üzerinde kontrol edilmesi gereken noktalar
+
+Bu görev dışında scope büyütme.

@@ -1,0 +1,91 @@
+Önce PROJECT.md ve docs/ANALIZ.md dosyalarını oku.
+
+Henüz kod yazma ve repository içerisindeki uygulama kodlarını değiştirme.
+
+SmartBudget AI projesi için teknik mimari taslağı hazırla.
+
+Kullanılacak teknoloji yığını:
+
+Mobile:
+- Flutter
+- Dart
+
+Backend:
+- ASP.NET Core Web API
+- C#
+- Entity Framework Core
+- JWT Authentication
+
+Database:
+- PostgreSQL
+
+AI:
+- LLM API entegrasyonu backend üzerinden yapılacak.
+
+Amaç:
+Kodlamaya başlamadan önce projenin backend, mobile, database ve AI yapısını netleştirmek.
+
+Aşağıdaki başlıklarda detaylı bir mimari taslak oluştur:
+
+1. Genel sistem mimarisi
+2. Flutter mobil uygulama klasör yapısı
+3. ASP.NET Core backend klasör yapısı
+4. Entity listesi
+5. Entity ilişkileri
+6. DTO yapısı
+7. Controller listesi
+8. Service listesi
+9. Repository / Entity Framework Core kullanımı
+10. Authentication ve JWT akışı
+11. Kullanıcı veri sahipliği / authorization yaklaşımı
+12. AI servisinin mimarideki konumu
+13. AI gider kategorileme akışı
+14. AI aylık analiz akışı
+15. AI hata ve fallback akışı
+16. Dashboard veri akışı
+17. Budget hesaplama akışı
+18. Bill / tüketim trendi akışı
+19. Backend ile Flutter arasındaki API iletişimi
+20. Hata yönetimi yaklaşımı
+21. Güvenlik açısından mimaride dikkat edilmesi gereken noktalar
+22. Önerilen geliştirme sırası
+
+Kurallar:
+
+- PROJECT.md ve ANALIZ.md ana kaynaklardır.
+- Bu iki dosyada olmayan yeni özellikleri uygulanacakmış gibi ekleme.
+- Gerçek banka entegrasyonu, ödeme sistemi veya yatırım özelliği ekleme.
+- Microservice mimarisi kullanma.
+- Gereksiz katman veya abstraction oluşturma.
+- Overengineering yapma.
+- Controller içerisinde business logic önermemelisin.
+- Business logic Service katmanında bulunmalı.
+- Kullanıcı kimliği request body içindeki UserId değerinden alınmamalı.
+- UserId JWT içerisindeki authenticated user bilgisinden alınmalı.
+- Kullanıcı yalnızca kendi kayıtlarına erişebilmeli.
+- AI API key yalnızca backend tarafında tutulmalı.
+- AI response güvenilmeyen veri olarak ele alınmalı.
+- AI kategorileme response'u JSON ve category whitelist ile doğrulanmalı.
+- AI başarısız olduğunda manuel kategori fallback'i korunmalı.
+- Finansal toplam, yüzde, bütçe ve trend hesaplamalarını AI'a yaptırma.
+- Bu hesaplamalar backend tarafından yapılmalı.
+- AI yalnızca backend tarafından hesaplanan verileri yorumlamalı.
+- Europe/Istanbul zaman dilimi gereksinimini dikkate al.
+- Trend grafiklerinin varsayılan olarak son 6 ayı göstermesi gereksinimini dikkate al.
+- ConsumptionValue alanının opsiyonel olduğunu dikkate al.
+- Elektrik tüketimi kWh, su ve doğalgaz tüketimi m³ olarak ele alınmalı.
+- Henüz hiçbir kod veya migration oluşturma.
+- Henüz package/dependency ekleme.
+- Sadece teknik mimari taslağı üret.
+
+Çıktının sonunda ayrıca şu iki bölümü ekle:
+
+## Mimari Kararlar
+Projede alınan önemli teknik kararları kısa maddeler halinde açıkla.
+
+## İnsan İncelemesinde Kontrol Edilmesi Gereken Noktalar
+Henüz kesin olmayan veya geliştirici tarafından doğrulanması gereken mimari kararları ayrı listele.
+
+Çıktıyı docs/TEKNIK_MIMARI_TASLAK.md dosyasına yaz.
+
+Bu çıktı ilk AI mimari taslağıdır ve insan tarafından incelenecektir.

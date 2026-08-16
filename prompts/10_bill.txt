@@ -1,0 +1,308 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Bu dosyalar projenin source of truth dokümanlarıdır.
+
+SmartBudget AI projesinde yalnızca Bill ve tüketim trendi özelliklerini geliştir.
+
+Mevcut Authentication/JWT, Category, Expense, Income ve Budget yapıları korunmalıdır.
+
+Bu aşamada Dashboard ve AI özelliklerine geçme.
+
+## Yapılacaklar
+
+1. Bill DTO'larını oluştur.
+
+En az:
+
+- CreateBillRequest
+- BillResponse
+- BillListItemResponse
+- BillTrendResponse
+
+oluştur.
+
+CreateBillRequest alanları:
+
+- BillType
+- Amount
+- ConsumptionValue
+- BillingDate
+
+Kurallar:
+
+- UserId request içinde bulunmamalıdır.
+- BillType yalnızca Electricity, Water veya NaturalGas olmalıdır.
+- Amount > 0 olmalıdır.
+- ConsumptionValue opsiyoneldir.
+- ConsumptionValue verilmişse > 0 olmalıdır.
+- BillingDate zorunlu olmalıdır.
+
+2. ConsumptionUnit yaklaşımını uygula.
+
+ConsumptionUnit veritabanında ayrı kalıcı alan olarak tutulmamalıdır.
+
+BillType üzerinden türetilmelidir:
+
+- Electricity → kWh
+- Water → m³
+- NaturalGas → m³
+
+Bill response içinde gerekiyorsa ConsumptionUnit gösterilebilir.
+
+Kullanıcıdan serbest metin birim alma.
+
+3. BillService oluştur.
+
+BillService Entity Framework Core AppDbContext'i doğrudan kullanmalıdır.
+
+Generic Repository veya Unit of Work oluşturma.
+
+BillService aşağıdaki işlerden sorumlu olmalıdır:
+
+### Bill oluşturma
+
+- authenticatedUserId parametresi al.
+- UserId request'ten alma.
+- BillType değerini doğrula.
+- Amount > 0 doğrula.
+- ConsumptionValue null olabilir.
+- ConsumptionValue verilmişse > 0 doğrula.
+- BillingDate zorunlu olmalıdır.
+- Yeni Guid oluştur.
+- UserId alanını authenticatedUserId değerinden ata.
+- CreatedAt UTC oluştur.
+- BillingDate tarih-only mantığıyla kullanılmalıdır.
+- Bill kaydını veritabanına kaydet.
+- Entity yerine BillResponse döndür.
+
+### Bill listesi
+
+Authenticated kullanıcının yalnızca kendi faturalarını döndür.
+
+Başka kullanıcı kayıtları listeye karışmamalıdır.
+
+AsNoTracking ve DTO projection kullan.
+
+Liste sıralamasını deterministik yap.
+
+Tercihen:
+
+- BillingDate descending
+- CreatedAt descending
+- Id descending
+
+kullan.
+
+### Bill silme
+
+DELETE /api/bills/{id}
+
+- Kayıt hem Id hem authenticated UserId ile aranmalıdır.
+- Önce yalnızca Id ile bulup sonra ownership kontrolü yapma.
+- Başka kullanıcıya ait veya bulunmayan kayıt için aynı güvenli 404 yaklaşımını kullan.
+- Başarılı silmede 204 No Content dön.
+
+4. Bill trend endpointini geliştir.
+
+Endpoint:
+
+GET /api/bills/trends
+
+Bu endpoint varsayılan olarak mevcut ay dahil son 6 aylık fatura ve tüketim trendini döndürmelidir.
+
+Dönem hesaplaması Europe/Istanbul zaman dilimi gereksinimiyle uyumlu olmalıdır.
+
+BillingDate tarih-only olduğu için son 6 aylık ay/yıl sınırlarını backend tarafında açık şekilde belirle.
+
+Flutter'ın dönem hesabı yapmasına güvenme.
+
+5. Trend hesaplama kuralları
+
+Trend yalnızca authenticated kullanıcının verilerinden oluşturulmalıdır.
+
+Başka kullanıcı verileri hiçbir koşulda trend hesabına girmemelidir.
+
+Her ay için:
+
+- toplam fatura tutarı
+- tüketim bilgisi
+
+backend tarafından hesaplanmalıdır.
+
+Tüketim trendlerinde farklı birimleri tek seri içinde birleştirme.
+
+Electricity tüketimi kWh,
+Water tüketimi m³,
+NaturalGas tüketimi m³
+
+olarak tür bazında ayrı anlamını korumalıdır.
+
+6. Null ConsumptionValue davranışı
+
+ConsumptionValue null olan faturalar:
+
+- fatura tutarı toplamına dahil edilmelidir.
+- tüketim hesabında sahte 0 değeri olarak ele alınmamalıdır.
+
+Örneğin bir ayda üç elektrik faturası varsa ve yalnızca ikisinde ConsumptionValue bulunuyorsa,
+tüketim toplamı yalnızca mevcut iki değerden hesaplanmalıdır.
+
+Null değeri 0 tüketim kaydı gibi yorumlama.
+
+7. BillTrendResponse
+
+Trend response yapısı sade ve Flutter grafiklerinde kullanılabilir olmalıdır.
+
+En az aşağıdaki bilgileri taşıyabilecek bir yapı oluştur:
+
+- Year
+- Month
+- BillType
+- TotalAmount
+- TotalConsumption
+- ConsumptionUnit
+
+TotalConsumption, ilgili ay/tür için hiç ConsumptionValue yoksa nullable olabilir.
+
+Gereksiz karmaşık grafik DTO hiyerarşisi oluşturma.
+
+8. BillsController oluştur.
+
+Endpointler:
+
+GET /api/bills
+GET /api/bills/trends
+POST /api/bills
+DELETE /api/bills/{id}
+
+Tüm endpointler authentication gerektirmelidir.
+
+Controller ince olmalıdır.
+
+Controller:
+
+- CurrentUserAccessor üzerinden authenticated UserId almalı,
+- BillService çağırmalı,
+- uygun HTTP response üretmeli.
+
+Business logic Controller içine yazılmamalıdır.
+
+9. Mevcut BillType enum yapısını kullan.
+
+Yeni veya paralel BillType sistemi oluşturma.
+
+Database check constraint ile uyum korunmalıdır.
+
+10. HTTP hata davranışları
+
+Beklenen durumlar:
+
+- Geçersiz BillType → 400
+- Amount <= 0 → 400
+- ConsumptionValue verilmiş ve <= 0 → 400
+- BillingDate eksik/geçersiz → 400
+- Authentication yok/geçersiz → 401
+- Başka kullanıcıya ait Bill silme isteği → 404
+- Bulunmayan Bill → 404
+- Beklenmeyen hata → güvenli 500
+
+Production response'larında stack trace gösterme.
+
+Mevcut merkezi exception/error handling yaklaşımını kullan.
+
+11. Testler oluştur.
+
+En az aşağıdaki davranışları test et:
+
+- Başarılı Electricity Bill oluşturma
+- Başarılı Water Bill oluşturma
+- Başarılı NaturalGas Bill oluşturma
+- UserId request'ten değil authenticated user id'den atanıyor
+- Amount 0 reddediliyor
+- Negatif Amount reddediliyor
+- ConsumptionValue null kabul ediliyor
+- ConsumptionValue 0 reddediliyor
+- Negatif ConsumptionValue reddediliyor
+- Geçersiz BillType reddediliyor
+- BillingDate zorunlu
+- ConsumptionUnit Electricity için kWh
+- ConsumptionUnit Water için m³
+- ConsumptionUnit NaturalGas için m³
+- Liste yalnızca authenticated kullanıcının kayıtlarını döndürüyor
+- Başka kullanıcı faturaları listeye karışmıyor
+- Liste sıralaması deterministik
+- Delete yalnızca sahibine izin veriyor
+- Başka kullanıcı Bill delete isteğinde 404
+- Bulunmayan Bill delete isteğinde 404
+- Silinen Bill listeden kaldırılıyor
+- Trend yalnızca authenticated kullanıcının verisini kullanıyor
+- Trend mevcut ay dahil son 6 ayı kapsıyor
+- 6 aydan eski faturalar trend sonucuna alınmıyor
+- Aylık TotalAmount doğru hesaplanıyor
+- Electricity tüketimi ayrı hesaplanıyor
+- Water tüketimi ayrı hesaplanıyor
+- NaturalGas tüketimi ayrı hesaplanıyor
+- Farklı BillType tüketimleri tek toplamda karıştırılmıyor
+- Null ConsumptionValue toplam tüketimde sahte 0 olarak kullanılmıyor
+- Hiç tüketim değeri yoksa TotalConsumption nullable davranıyor
+- Entity doğrudan API response olarak kullanılmıyor
+
+Mümkün olduğunca mevcut test altyapısını kullan.
+
+12. Build ve tüm testleri çalıştır.
+
+Mevcut:
+
+- Authentication
+- Category/Expense
+- Income
+- Budget
+
+testleri geçmeye devam etmelidir.
+
+## Çok Önemli Kurallar
+
+- PROJECT.md, ANALIZ.md ve TEKNIK_MIMARI_TASLAK.md ile çelişme.
+- Mevcut Authentication/JWT yapısını gereksiz şekilde değiştirme.
+- Mevcut Category/Expense yapısını gereksiz şekilde değiştirme.
+- Mevcut Income yapısını gereksiz şekilde değiştirme.
+- Mevcut Budget yapısını gereksiz şekilde değiştirme.
+- Dashboard geliştirme.
+- AI kategorileme geliştirme.
+- AI aylık analiz geliştirme.
+- Bill update endpointi ekleme.
+- Bill detail endpointi ekleme.
+- ConsumptionUnit değerini database alanı olarak ekleme.
+- Generic Repository ekleme.
+- Unit of Work ekleme.
+- CQRS ekleme.
+- MediatR ekleme.
+- Microservice yapısı oluşturma.
+- Request DTO'larına UserId ekleme.
+- Finansal veya trend hesaplarını Flutter'a taşıma.
+- Entity'leri doğrudan API response olarak döndürme.
+- Source-of-truth dokümanlarını kendiliğinden değiştirme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen dosyalar
+2. Bill DTO'ları
+3. Bill create akışı
+4. BillType ve ConsumptionUnit yaklaşımı
+5. Ownership yaklaşımı
+6. Bill list/delete davranışları
+7. Son 6 ay trend hesabı
+8. TotalAmount hesaplama yaklaşımı
+9. TotalConsumption ve null ConsumptionValue davranışı
+10. Europe/Istanbul dönem hesabı
+11. HTTP hata davranışları
+12. Oluşturulan testler
+13. Build sonucu
+14. Toplam test sonucu
+15. Önceki test gruplarının durumu
+16. Bilerek geliştirilmemiş özellikler
+17. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

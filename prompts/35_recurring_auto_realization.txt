@@ -1,0 +1,490 @@
+Önce PROJECT.md, docs/ANALIZ.md, docs/TEKNIK_MIMARI_TASLAK.md ve
+prompts/34_recurring_financial_records.txt dosyasını oku.
+
+Ardından mevcut recurring implementation'ı incele.
+
+Bu görev prompt 34'teki recurring davranışına yapılan İNSAN REVİZYONUDUR.
+
+## Problem
+
+Mevcut implementation recurring Income/Expense için kullanıcıdan her ay:
+
+"Bu Ay İçin Oluştur"
+
+butonuna basmasını bekliyor.
+
+Bu kullanıcı beklentisine uygun değil.
+
+Kullanıcı örneğin:
+
+Maaş
+45.000 TL
+Her ay
+Başlangıç: 16 Ağustos
+
+tanımladıysa her ay tekrar manuel butona basmamalıdır.
+
+İstenen yeni davranış:
+
+Recurring kayıt, zamanı geldiğinde backend tarafından otomatik realize edilmelidir.
+
+Örneğin:
+
+StartDate = 2026-08-16
+Frequency = Monthly
+
+ise:
+
+2026-08-16 00:00 Europe/Istanbul
+2026-09-16 00:00 Europe/Istanbul
+2026-10-16 00:00 Europe/Istanbul
+...
+
+tarihlerinde otomatik gerçekleşmelidir.
+
+---
+
+# 1. Recurrence Day
+
+Monthly recurring rule için StartDate.Day tekrar günü olarak kullanılmalıdır.
+
+Örnek:
+
+StartDate = 16 Ağustos
+
+=> her ayın 16'sı.
+
+UI'da kullanıcıya bunu açık şekilde göster:
+
+"Her ayın 16'sında"
+
+gibi.
+
+---
+
+# 2. Otomatik Realization
+
+Backend'de mevcut ASP.NET Core uygulaması içinde sade bir hosted/background service kullan.
+
+Örneğin mevcut mimariye uygun:
+
+BackgroundService / IHostedService
+
+kullanılabilir.
+
+Hangfire, Quartz veya üçüncü parti scheduler package EKLEME.
+
+Service Europe/Istanbul zamanına göre due recurring rule'ları kontrol etmelidir.
+
+Amaç:
+ilgili gün geldiğinde otomatik realization.
+
+---
+
+# 3. Çalışma Zamanı
+
+Business açısından hedef:
+
+ilgili gün 00:00 Europe/Istanbul sonrası kaydın otomatik gerçekleşmiş olmasıdır.
+
+Background service güvenilir ve idempotent olmalıdır.
+
+Uygulama tam 00:00'da kapalıysa:
+
+örneğin 08:00'de tekrar ayağa kalktığında o günün eksik occurrence'ını oluşturmalıdır.
+
+Yani yalnızca tam saat 00:00 eşitliğine güvenme.
+
+Mantık:
+
+- bugün recurrence günü mü?
+- bu ay occurrence zaten oluşturulmuş mu?
+- değilse realize et
+
+şeklinde olmalıdır.
+
+---
+
+# 4. Duplicate Protection
+
+Mevcut RecurringOccurrence unique:
+
+Rule + Year + Month
+
+korumasını kullanmaya devam et.
+
+Background service birkaç kez çalışsa bile aynı ay için ikinci kayıt oluşmamalıdır.
+
+Race condition durumunda database unique constraint son savunma olmalıdır.
+
+---
+
+# 5. Income
+
+Recurring Income:
+
+Amount belli olduğu için zamanı geldiğinde otomatik Income oluştur.
+
+Örnek:
+
+Maaş
+45.000
+Her ayın 16'sı
+
+=> 16'sında otomatik Income.
+
+Dashboard yalnız gerçek Income oluştuktan sonra etkilenir.
+
+---
+
+# 6. Expense
+
+Recurring Expense:
+
+Amount belli olduğu için zamanı geldiğinde otomatik Expense oluştur.
+
+Örnek:
+
+Kira
+20.000
+Kategori: Kira
+Her ayın 5'i
+
+=> ayın 5'inde otomatik Expense.
+
+Budget SpentAmount ve Dashboard mevcut Expense tabanlı hesaplama sayesinde doğal olarak etkilenmelidir.
+
+Yeni finansal hesaplama oluşturma.
+
+---
+
+# 7. Bill — Sabit Tutar
+
+Recurring Bill rule'da template Amount mevcutsa:
+
+zamanı geldiğinde otomatik gerçek Bill oluşturulabilir.
+
+Mevcut BillService üzerinden:
+
+Bill
++
+linked Expense
+
+oluşturulmalıdır.
+
+Dashboard yalnız linked Expense üzerinden etkilenmelidir.
+
+Double counting oluşturma.
+
+---
+
+# 8. Bill — Tutar Bilinmiyor
+
+Recurring Bill Amount = null ise:
+
+otomatik olarak:
+
+- 0 TL Bill
+- sahte Bill
+- Expense
+
+OLUŞTURMA.
+
+Bu rule ilgili ay için "girilmesi bekleniyor" / due durumda kalmalıdır.
+
+Flutter Faturalar ekranında kullanıcı:
+
+"Bu ay girilmesi bekleniyor"
+
+benzeri kullanıcı dostu durum görmelidir.
+
+Kullanıcı gerçek:
+
+- Amount
+- optional ConsumptionValue
+
+girince mevcut realize endpoint ile gerçek Bill oluşturulur.
+
+Bill -> Expense sync aynen çalışır.
+
+---
+
+# 9. Manuel "Bu Ay İçin Oluştur" Butonu
+
+Income ve Expense için normal kullanıcı akışında artık bu butona ihtiyaç olmamalıdır.
+
+Çünkü bunlar otomatik gerçekleşir.
+
+Planlananlar ekranında bunun yerine durum göster:
+
+- Bekleniyor
+- Gerçekleşti
+
+gibi.
+
+Manuel realize endpoint backend'de test/admin/fallback amacıyla kalabilir,
+ancak normal Flutter UX'de Income/Expense için kullanıcıya zorunlu buton olarak gösterme.
+
+Bill Amount=null için kullanıcı aksiyonu hâlâ gerekir:
+
+"Faturayı Gir"
+
+gibi daha doğru bir label kullan.
+
+---
+
+# 10. Uygulama Kapalıyken
+
+Bu ASP.NET Core hosted service yalnız backend process çalışırken çalışabilir.
+
+Bu MVP için kabul edilebilir.
+
+Ancak backend yeniden başladığında:
+
+bugünün due kayıtlarını kontrol ederek missed execution'ı tamamlamalıdır.
+
+Örneğin:
+
+Due day = 16
+backend 00:00'da kapalı
+backend 16'sında 10:30'da açıldı
+
+=> occurrence yoksa otomatik realize et.
+
+Ancak geçmiş ayların tamamını keyfi şekilde backfill etme.
+
+Bu görevde yalnız mevcut gün/ay için catch-up yeterlidir.
+
+---
+
+# 11. Day 29 / 30 / 31
+
+Monthly recurrence başlangıç günü ilgili ayda yoksa:
+
+o ayın son gününü kullan.
+
+Örnek:
+
+StartDate = 31 Ocak
+
+Şubat:
+ayın son günü
+
+Nisan:
+30 Nisan
+
+Mayıs:
+31 Mayıs
+
+Bu davranışı deterministic helper ile uygula ve test et.
+
+---
+
+# 12. EndDate
+
+Rule EndDate geçmişse otomatik realization yapma.
+
+EndDate'in bulunduğu ay/gün sınırını doğru uygula.
+
+IsActive=false rule çalışmamalıdır.
+
+---
+
+# 13. Timezone
+
+Tüm scheduling/due kararı:
+
+Europe/Istanbul
+
+üzerinden yapılmalıdır.
+
+UTC server clock'a göre doğrudan DateTime.Now kullanma.
+
+Mevcut TimeProvider yaklaşımını mümkünse kullan.
+
+Test edilebilir tasarım kur.
+
+---
+
+# 14. Hosted Service Güvenliği
+
+BackgroundService:
+
+- exception nedeniyle tamamen ölmemeli
+- bir rule hata verirse diğer rule'lara devam edebilmeli
+- secret veya finansal hassas içerik loglamamalı
+- anlamlı structured log yazabilir
+
+Ancak aşırı karmaşık retry altyapısı ekleme.
+
+---
+
+# 15. Dashboard Refresh
+
+Backend otomatik realization yaptığı için Flutter uygulaması o anda açık olmayabilir.
+
+Flutter Dashboard açıldığında/refreshed olduğunda backend'deki güncel değerleri göstermelidir.
+
+Yeni websocket/push sistemi ekleme.
+
+Kullanıcı uygulamada sekmeye döndüğünde veya pull-to-refresh yaptığında güncel veri görünmesi yeterlidir.
+
+Mevcut mutation callback mekanizmasını bozma.
+
+---
+
+# 16. Planlananlar UI
+
+Recurring kayıt kartında kullanıcıya açık şekilde göster:
+
+Örneğin:
+
+Maaş
+45.000 TL
+Her ayın 16'sında
+6 ay
+Sonraki: 16 Eylül 2026
+Durum: Bekleniyor
+
+ve gerçekleşmiş mevcut ay için:
+
+Durum: Gerçekleşti
+
+Ancak authoritative due/occurrence bilgisi backend'den gelmelidir.
+
+Flutter finansal business calculation yapmamalıdır.
+
+---
+
+# 17. Backend Response
+
+RecurringRule response'a UI'nın ihtiyacı varsa minimum şekilde:
+
+- IsRealizedForCurrentMonth
+- NextDueDate
+
+gibi backend-calculated presentation-support alanları eklenebilir.
+
+Bunları Flutter'da karmaşık recurrence hesabıyla üretme.
+
+API contract'ı yalnız gerçekten gerekliyse minimum genişlet.
+
+---
+
+# 18. Tests — Backend
+
+En az:
+
+1. Monthly Income due gününde otomatik realize edilir.
+2. Due gününden önce realize edilmez.
+3. Aynı ay ikinci kez oluşmaz.
+4. Backend due gününde geç açılırsa occurrence yoksa catch-up yapılır.
+5. Expense aynı şekilde otomatik oluşur.
+6. Expense Budget'a doğal olarak dahil olur.
+7. Fixed Amount Bill otomatik Bill oluşturur.
+8. Fixed Bill linked Expense oluşturur.
+9. Fixed Bill Dashboard'da double count edilmez.
+10. Amount=null Bill otomatik Bill oluşturmaz.
+11. Amount=null Bill due olarak kalır.
+12. IsActive=false rule çalışmaz.
+13. EndDate geçmiş rule çalışmaz.
+14. 31 -> kısa ayda ayın son günü davranışı.
+15. Europe/Istanbul timezone.
+16. Rule+Year+Month duplicate koruması.
+17. Bir rule hata verirse processor diğer rule'ları işlemeye devam eder.
+18. başka kullanıcı ownership kuralları bozulmaz.
+
+Hosted service logic'i doğrudan saat bekleyen testlerle test etme.
+TimeProvider/fake time kullan.
+
+---
+
+# 19. Tests — Flutter
+
+En az:
+
+1. Income recurring card "Bu Ay İçin Oluştur" zorunlu butonu göstermez.
+2. Expense recurring card aynı.
+3. Bekleyen rule doğru status gösterir.
+4. Gerçekleşmiş current month doğru status gösterir.
+5. NextDueDate kullanıcı dostu gösterilir.
+6. Amount=null Bill due ise "Faturayı Gir" aksiyonu görünür.
+7. Bill amount formu mevcut realize endpointini kullanır.
+8. normal one-time create akışları bozulmaz.
+
+---
+
+# 20. Mevcut Kurallar Korunacak
+
+- Dashboard yalnız gerçekleşmiş finansal kayıtlardan hesaplanır.
+- Planned değerler Dashboard'a eklenmez.
+- Bill -> Expense sync korunur.
+- Bill-linked Expense bağımsız silinemez.
+- UserId JWT'den.
+- Ownership 404.
+- Flutter authoritative finansal hesap yapmaz.
+- generic repository/UoW/CQRS/MediatR ekleme.
+- yeni state management package ekleme.
+
+---
+
+# 21. Migration
+
+Mevcut model yeterliyse migration oluşturma.
+
+Yeni persisted field gerçekten gerekiyorsa minimum migration oluştur.
+
+Occurrence tablosu zaten mevcutsa duplicate yeni tablo oluşturma.
+
+---
+
+# 22. Son Doğrulama
+
+Backend:
+
+dotnet build
+dotnet test
+
+Flutter:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+Development PostgreSQL üzerinde gerçek smoke:
+
+- bugün due olacak test Income rule oluştur
+- otomatik processor çalıştır
+- Income oluştuğunu doğrula
+- ikinci çalıştırmada duplicate olmadığını doğrula
+- amount=null Bill'in otomatik gerçek Bill oluşturmadığını doğrula
+
+Test verilerini temizle.
+
+---
+
+# İş Bitiminde Raporla
+
+1. Önceki manuel realize davranışından ne değişti
+2. Background processor yapısı
+3. Europe/Istanbul zaman hesabı
+4. Recurrence day hesabı
+5. 29/30/31 davranışı
+6. Income auto-realize
+7. Expense auto-realize
+8. Fixed Bill auto-realize
+9. Unknown Amount Bill davranışı
+10. Duplicate protection
+11. Missed midnight/catch-up davranışı
+12. Flutter Planlananlar UX değişikliği
+13. Değiştirilen dosyalar
+14. Migration varsa adı
+15. Backend test sonucu
+16. Flutter test sonucu
+17. flutter analyze sonucu
+18. APK build sonucu
+19. PostgreSQL smoke sonucu
+20. Manuel emulator üzerinde kontrol edilmesi gerekenler
+
+Bu görev dışında scope büyütme.

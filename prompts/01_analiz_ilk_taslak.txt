@@ -1,0 +1,41 @@
+Önce PROJECT.md dosyasını oku.
+
+Henüz kod yazma ve repository içerisindeki uygulama kodlarını değiştirme.
+
+SmartBudget AI projesi için analiz dokümanının ilk taslağını hazırla.
+
+Analiz dokümanında aşağıdaki bölümler bulunmalıdır:
+
+1. Problem Tanımı
+2. Projenin Amacı
+3. Hedef Kullanıcılar
+4. Fonksiyonel Gereksinimler
+5. Fonksiyonel Olmayan Gereksinimler
+6. Kapsam
+7. Kapsam Dışı
+8. Varsayımlar
+9. Kısıtlar
+10. Kullanıcı Hikâyeleri
+11. Her kullanıcı hikâyesi için Given / When / Then kabul kriterleri
+12. Temel hata senaryoları
+13. Edge-case senaryoları
+14. AI kullanılan özellikler
+15. AI kullanılmaması gereken alanlar
+16. Güvenlik ve kişisel veri açısından temel riskler
+
+Kurallar:
+
+- PROJECT.md ana kaynak olarak kullanılmalıdır.
+- PROJECT.md içerisinde olmayan özellikleri uygulanacakmış gibi ekleme.
+- Emin olmadığın gereksinimleri "varsayım" olarak açıkça işaretle.
+- Gereksiz veya proje kapsamını büyüten özellikler ekleme.
+- Teknik implementasyon detaylarına fazla girme; bu bir analiz dokümanıdır.
+- Kullanıcı hikâyelerini "Bir kullanıcı olarak..., istiyorum..., böylece..." formatında yaz.
+- Kabul kriterlerini Given / When / Then formatında oluştur.
+- AI özelliklerinde hata ve fallback senaryolarını dikkate al.
+- Kullanıcının yalnızca kendi verilerine erişebilmesi gereksinimini dikkate al.
+- Çıktıyı Markdown formatında üret.
+
+Bu yalnızca ilk AI taslağıdır ve insan tarafından incelenecektir.
+
+Çıktıyı docs/ANALIZ.md dosyasına yaz.

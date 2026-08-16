@@ -1,0 +1,42 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Mevcut teknik mimari genel olarak kabul edildi. İnsan incelemesinde aşağıdaki kararlar netleştirildi:
+
+1. Entity primary key tipi Guid olacak.
+2. Finansal tutarlar PostgreSQL tarafında numeric(18,2) olarak tutulacak.
+3. CreatedAt alanları UTC tutulacak.
+4. Date ve BillingDate tarih-only mantığıyla ele alınacak.
+5. Aylık raporlama ve trend hesaplarında Europe/Istanbul zaman dilimi esas alınacak.
+6. JWT kullanıcı kimliği standart bir user id claim üzerinden okunacak.
+7. JWT access token süresi MVP için 60 dakika olacak.
+8. Refresh token MVP kapsamında olmayacak.
+9. Flutter tarafında JWT güvenli saklama için flutter_secure_storage kullanılacak.
+10. Başka kullanıcıya ait kaynağa erişimde veri sızıntısını azaltmak için 404 yaklaşımı kullanılacak.
+11. Income.Description opsiyonel olacak.
+12. Sabit gider kategorileri database seed ile oluşturulacak.
+13. AI kategori önerisi kullanıcıya öneri olarak gösterilecek; otomatik ve zorunlu seçim yapılmayacak.
+14. Kullanıcı AI önerisini kabul edebilecek veya manuel olarak değiştirebilecek.
+15. ConsumptionValue opsiyonel kalacak; verilmişse sıfırdan büyük olmak zorunda olacak.
+16. Bill trend endpoint'i BillsController altında konumlanacak.
+17. Budget update işleminde yalnızca LimitAmount değiştirilebilecek. CategoryId, Month ve Year değiştirilemeyecek.
+18. Mimari yapının geri kalanını değiştirme.
+19. Yeni katman, yeni servis veya yeni özellik ekleme.
+20. Generic repository, CQRS, mediator, microservice veya Unit of Work ekleme.
+
+Bu kararları:
+
+- Entity tanımları
+- DTO yapısı
+- Authentication/JWT akışı
+- Flutter auth/token yönetimi
+- Bill akışı
+- Budget akışı
+- hata yönetimi
+- mimari kararlar
+- insan incelemesinde kontrol edilecek noktalar
+
+bölümlerinde tutarlı şekilde güncelle.
+
+Çıktının sonunda kısa bir "Revizyon Özeti" ekle.
+
+Mevcut docs/TEKNIK_MIMARI_TASLAK.md dosyasını güncelle.

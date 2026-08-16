@@ -1,0 +1,755 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut Flutter `mobile/` yapısını ve backend Budget + Category endpoint sözleşmelerini incele.
+
+Bu görevde yalnızca Flutter Budget entegrasyonunu geliştir.
+
+Mevcut Authentication, ApiClient, secure storage, Dashboard, Transactions, navigation ve theme yapısını koru.
+
+Bu aşamada Bill entegrasyonuna geçme.
+
+## Amaç
+
+Flutter uygulamasındaki Bütçeler ekranını gerçek backend Budget endpointleriyle çalışır hale getirmek.
+
+Kullanıcı:
+
+- seçili ay/yıldaki bütçelerini görebilmeli,
+- yeni bütçe oluşturabilmeli,
+- yalnızca bütçe limitini güncelleyebilmeli,
+- bütçe kaydını silebilmeli,
+- harcanan tutarı,
+- kullanım yüzdesini,
+- Normal / Warning / Exceeded durumunu
+
+backend tarafından hesaplanan değerlerden görebilmelidir.
+
+Flutter finansal bütçe hesabı yapmamalıdır.
+
+---
+
+## 1. Backend sözleşmesini doğrudan incele
+
+Aşağıdaki backend dosyalarını incele:
+
+- BudgetsController
+- BudgetService
+- Budget DTO'ları
+- BudgetAlertStatus
+- Category DTO'ları
+- CategoriesController
+
+JSON field isimlerini tahmin etme.
+
+Flutter model ve request yapılarını backend DTO'larıyla birebir uyumlu oluştur.
+
+Backend kodunu değiştirme.
+
+---
+
+## 2. Budget modelleri
+
+Flutter tarafında backend sözleşmesine uygun modeller oluştur.
+
+En az:
+
+- CreateBudgetRequest
+- UpdateBudgetRequest
+- BudgetResponse / BudgetListItem eşdeğeri
+- BudgetAlertStatus eşlemesi
+
+gerekir.
+
+Known backend alanları:
+
+- Id
+- Category
+- LimitAmount
+- Month
+- Year
+- SpentAmount
+- UsagePercent
+- AlertStatus
+- CreatedAt
+
+Category entity'sini mobile taşıma.
+Backend response DTO'sunu temsil eden sade model kullan.
+
+---
+
+## 3. CreateBudgetRequest
+
+Request yalnızca backend DTO alanlarını içermelidir:
+
+- CategoryId
+- LimitAmount
+- Month
+- Year
+
+UserId bulunmamalıdır.
+
+Kurallar:
+
+- LimitAmount > 0
+- Month 1–12
+- Year 2000–2100
+- CategoryId backend category listesinden seçilmelidir
+
+---
+
+## 4. UpdateBudgetRequest
+
+Backend sözleşmesi gereği yalnızca:
+
+- LimitAmount
+
+içermelidir.
+
+Flutter update request içine:
+
+- CategoryId
+- Month
+- Year
+- UserId
+
+eklememelidir.
+
+---
+
+## 5. BudgetService
+
+Flutter tarafında sade BudgetService oluştur.
+
+Mevcut ApiClient'i kullan.
+
+Endpointler:
+
+- `GET /api/budgets`
+- `POST /api/budgets`
+- `PUT /api/budgets/{id}`
+- `DELETE /api/budgets/{id}`
+
+Backend'de olmayan detail endpointi ekleme.
+
+Sorumluluklar:
+
+- list
+- create
+- update limit
+- delete
+- response parse
+- kontrollü hata aktarımı
+
+---
+
+## 6. CategoryService'i yeniden kullan
+
+Mevcut Transactions aşamasında oluşturulan CategoryService'i kullan.
+
+İkinci bir category API servisi oluşturma.
+
+Yeni bütçe oluştururken Category dropdown/select backend category listesinden gelmelidir.
+
+---
+
+## 7. Budget state yaklaşımı
+
+Mevcut sade ChangeNotifier yaklaşımını koru.
+
+Gerekirse:
+
+`BudgetsViewModel`
+
+oluştur.
+
+State en az:
+
+- loading
+- error
+- budgets
+- categories
+- selected month
+- selected year
+- create loading
+- update loading
+- delete loading
+
+durumlarını yönetmelidir.
+
+Yeni state-management paketi ekleme.
+
+---
+
+## 8. İlk yükleme
+
+Bütçeler ekranı açıldığında:
+
+`GET /api/budgets`
+
+çağrısı yapılmalıdır.
+
+Backend kullanıcının tüm Budget kayıtlarını döndürüyorsa Flutter bunları selected Month/Year için presentation amacıyla filtreleyebilir.
+
+Bu filtre yalnızca liste sunumu içindir.
+
+SpentAmount, UsagePercent veya AlertStatus Flutter tarafından yeniden hesaplanmamalıdır.
+
+---
+
+## 9. Ay/yıl seçimi
+
+Ekranın üst kısmında sade bir period selector bulunmalıdır.
+
+Dashboard ile mümkün olduğunca aynı tasarım/UX yaklaşımını kullan.
+
+Kullanıcı:
+
+- Month 1–12
+- Year 2000–2100
+
+arasında seçim yapabilmelidir.
+
+İlk dönem için mümkünse mevcut backend Budget kayıtlarından veya Europe/Istanbul kullanıcı deneyimiyle uyumlu mevcut ay/yıl kullanılabilir.
+
+Ancak bunun için finansal hesap yapma.
+
+UI dönem seçimi yalnızca hangi Budget kayıtlarının gösterileceğini belirler.
+
+---
+
+## 10. Bütçe listesi
+
+Seçili ay/yıla ait bütçeler kart halinde gösterilmelidir.
+
+Her kartta:
+
+- Category name
+- LimitAmount
+- SpentAmount
+- UsagePercent
+- AlertStatus
+
+göster.
+
+İstersen kalan tutarı görsel olarak göstermek için:
+
+LimitAmount - SpentAmount
+
+hesabını yapma.
+
+Source-of-truth dokümanda finansal hesapların backend'de kalması ilkesi nedeniyle, backend response'ta RemainingAmount yoksa mobilde yeni finansal değer üretme.
+
+Yalnızca backend'in verdiği alanları göster.
+
+---
+
+## 11. UsagePercent
+
+Backend UsagePercent değerini doğrudan göster.
+
+Flutter tekrar hesaplamamalıdır.
+
+Örnek:
+
+Backend `%135` döndürürse:
+
+- text `%135`
+- progress bar maksimum genişlikte
+
+olabilir.
+
+Progress indicator render değeri clamp edilebilir.
+
+Ancak displayed financial percentage değiştirilemez.
+
+---
+
+## 12. AlertStatus
+
+Backend string enum değerlerini güvenli biçimde eşleştir:
+
+- Normal
+- Warning
+- Exceeded
+
+UI:
+
+Normal:
+- Success / green
+- `Normal`
+
+Warning:
+- Warning / amber
+- `Kritik` veya `Limite Yakın`
+
+Exceeded:
+- Error / red
+- `Limit Aşıldı`
+
+Sadece renkle bilgi verme; text etiketi de göster.
+
+Bilinmeyen enum değeri geldiğinde uygulama çökmemelidir.
+
+Kontrollü fallback kullan.
+
+---
+
+## 13. Empty state
+
+Seçili ay/yılda Budget yoksa:
+
+`Bu dönem için henüz bütçe oluşturulmamış.`
+
+gibi sade empty state göster.
+
+Aksiyon:
+
+`Yeni Bütçe Ekle`
+
+olabilir.
+
+Fake Budget kartı üretme.
+
+---
+
+## 14. Yeni Bütçe Ekle ekranı
+
+DESIGN.md ile uyumlu form oluştur.
+
+Alanlar:
+
+- Kategori
+- Bütçe Limiti
+- Ay
+- Yıl
+
+Buton:
+
+`Bütçeyi Kaydet`
+
+---
+
+## 15. Kategori seçimi
+
+Kategori listesi backend'den gelmelidir.
+
+Kullanıcı yalnızca mevcut backend kategorilerinden seçebilmelidir.
+
+Mobil yeni kategori oluşturmamalıdır.
+
+Kategori adı değiştirilmemelidir.
+
+---
+
+## 16. LimitAmount validation
+
+UI seviyesinde:
+
+- boş olamaz
+- sayısal olmalı
+- > 0
+
+kontrollerini yap.
+
+Backend nihai validation kaynağıdır.
+
+Türkçe decimal input kullanımını mevcut transaction amount yaklaşımıyla mümkün olduğunca ortaklaştır.
+
+Gerekiyorsa mevcut validator/helper fonksiyonlarını tekrar kullan.
+
+---
+
+## 17. Month/Year validation
+
+Month:
+
+- 1–12
+
+Year:
+
+- 2000–2100
+
+UI picker kullan.
+
+Serbest text gerekmez.
+
+---
+
+## 18. Duplicate Budget davranışı
+
+Backend aynı:
+
+UserId + CategoryId + Month + Year
+
+için duplicate Budget'a izin vermemektedir.
+
+Backend 409 Conflict döndürdüğünde kullanıcı dostu mesaj göster.
+
+Örneğin:
+
+`Bu kategori için seçilen dönemde zaten bir bütçe bulunuyor.`
+
+Raw backend exception veya PostgreSQL unique constraint detayı gösterme.
+
+---
+
+## 19. Başarılı create
+
+POST başarılı olduğunda:
+
+- form kapanabilir
+- Budget listesi yenilenmeli
+- oluşturulan Budget seçili dönem içindeyse görünmelidir
+- kısa success feedback verilebilir
+
+Double-submit engelle.
+
+---
+
+## 20. Budget güncelleme
+
+Budget kartında:
+
+- edit aksiyonu
+
+bulunabilir.
+
+Edit ekranı veya bottom sheet aç.
+
+Göster:
+
+- Category → read-only
+- Month → read-only
+- Year → read-only
+- LimitAmount → editable
+
+Backend kuralı gereği yalnızca LimitAmount değiştirilebilir.
+
+---
+
+## 21. Update request
+
+Kullanıcı yeni limit girdikten sonra:
+
+`PUT /api/budgets/{id}`
+
+çağrısı yap.
+
+Request yalnızca:
+
+`limitAmount`
+
+içermelidir.
+
+Category, Month veya Year request'e eklenmemelidir.
+
+---
+
+## 22. Update success
+
+Update başarılı olduğunda backend'den dönen BudgetResponse kullan.
+
+Mobil:
+
+- SpentAmount hesaplamamalı
+- UsagePercent hesaplamamalı
+- AlertStatus hesaplamamalı
+
+Güncellenen backend response'u göster veya listeyi refresh et.
+
+---
+
+## 23. Update 404
+
+Backend 404 döndürürse ownership detayı açıklama.
+
+Sade mesaj:
+
+`Bütçe kaydı bulunamadı veya artık mevcut değil.`
+
+Ardından liste refresh edilebilir.
+
+---
+
+## 24. Budget silme
+
+Delete aksiyonunda confirmation dialog göster.
+
+Örnek:
+
+`Bu bütçe kaydını silmek istediğinizden emin misiniz?`
+
+Butonlar:
+
+- İptal
+- Sil
+
+Endpoint:
+
+`DELETE /api/budgets/{id}`
+
+---
+
+## 25. Delete success
+
+204 sonrası:
+
+- local listeden kaldır
+veya
+- Budget listesini refresh et
+
+Her iki yaklaşım da kabul edilebilir.
+
+Seçili dönem empty hale gelirse empty state görünmelidir.
+
+---
+
+## 26. Delete 404
+
+Başka kullanıcı ownership detayını sızdırma.
+
+Sade mesaj kullan ve listeyi güncelle.
+
+---
+
+## 27. Pull-to-refresh
+
+Budget ekranında RefreshIndicator kullan.
+
+Refresh:
+
+- Budget listesini yenilesin
+
+Category listesini gereksiz yere tekrar çağırma.
+
+AI veya başka endpoint çağrısı yapma.
+
+---
+
+## 28. Dashboard ile veri ilişkisi
+
+Budget create/update/delete sonrasında Dashboard'un eski state'i otomatik finansal hesapla düzeltilmeye çalışılmamalıdır.
+
+Kullanıcı Dashboard sekmesine döndüğünde mevcut Dashboard refresh mekanizması kullanılabilir.
+
+Bu aşamada karmaşık cross-screen global state synchronization sistemi oluşturma.
+
+---
+
+## 29. Design
+
+`docs/DESIGN.md` kurallarını uygula.
+
+Bütçe kartında:
+
+- Category
+- Limit
+- Harcanan
+- Usage Percent
+- Status
+- Progress
+
+net okunmalıdır.
+
+Stitch'te daha önce görünen AI Budget önerilerini ekleme.
+
+Budget için AI özelliği yoktur.
+
+---
+
+## 30. Para formatlama
+
+LimitAmount ve SpentAmount yalnızca presentation amacıyla Türkçe para formatına dönüştürülebilir.
+
+Örneğin:
+
+`₺5.000,00`
+
+Flutter bunlardan yeni finansal sonuç üretmemelidir.
+
+---
+
+## 31. Accessibility
+
+Status yalnızca renkle belirtilmemeli.
+
+Progress indicator yanında gerçek yüzde text'i bulunmalıdır.
+
+Exceeded >100 durumunda progress dolu görünse bile gerçek yüzde yazılmalıdır.
+
+---
+
+## 32. Error handling
+
+Mevcut ApiClient hata sistemini kullan.
+
+Beklenen:
+
+- 400 validation
+- 401 merkezi session handling
+- 404 safe not found
+- 409 duplicate
+- 500 / network / timeout
+
+Raw ProblemDetails veya exception göstermeme.
+
+---
+
+## 33. Güvenlik
+
+- UserId hiçbir Budget request'inde bulunmamalıdır.
+- JWT merkezi ApiClient üzerinden gitmelidir.
+- Ownership backend tarafından yapılmalıdır.
+- Flutter yalnızca kendi authenticated endpointlerini çağırmalıdır.
+- CategoryId backend category listesinden seçilmelidir.
+- Request'e hidden ownership değerleri ekleme.
+
+---
+
+## 34. Testler
+
+Gerçek backend'e bağımlı test oluşturma.
+
+Fake/mock service yaklaşımı kullan.
+
+En az şu davranışları test et:
+
+### Service/model
+
+- Budget response doğru parse edilir.
+- AlertStatus Normal parse edilir.
+- Warning parse edilir.
+- Exceeded parse edilir.
+- UsagePercent > 100 korunur.
+- Create request UserId içermez.
+- Update request yalnızca LimitAmount içerir.
+- Service doğru endpointleri kullanır.
+
+### List
+
+- Loading state.
+- Error + retry.
+- Empty state.
+- Budget listesi render.
+- Selected month/year filtreleme.
+- Başka dönem Budget gösterilmez.
+- Normal UI doğru.
+- Warning UI doğru.
+- Exceeded UI doğru.
+- `%135` text korunur.
+- Progress visual clamp edilir.
+
+### Create
+
+- Category zorunlu.
+- Limit boş reddedilir.
+- Limit 0 reddedilir.
+- Negatif limit reddedilir.
+- Month/year doğru request'e gider.
+- UserId gönderilmez.
+- Create success listeyi yeniler.
+- 409 duplicate kullanıcı dostu mesaj üretir.
+- Double-submit engellenir.
+
+### Update
+
+- Category read-only.
+- Month read-only.
+- Year read-only.
+- Yalnızca LimitAmount editable.
+- Update payload yalnızca LimitAmount.
+- Başarılı update backend response değerlerini kullanır.
+- UsagePercent Flutter'da yeniden hesaplanmaz.
+- 404 güvenli mesaj.
+
+### Delete
+
+- Confirmation gösterilir.
+- Success sonrası kayıt listeden kalkar.
+- 404 güvenli davranır.
+
+### Refresh
+
+- Pull-to-refresh Budget listesini tekrar yükler.
+- Category endpointi gereksiz tekrar çağrılmaz.
+
+### Security
+
+- UserId payloadlarda yok.
+- Ownership client'ta hesaplanmıyor.
+
+35. Mevcut Flutter testlerini koru.
+
+Önceki:
+
+- Auth
+- Dashboard
+- Transactions/Expense/Income/AI Categorization
+
+testleri geçmeye devam etmelidir.
+
+36. Static analysis / format / build
+
+İş bitiminde çalıştır:
+
+flutter pub get
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+## Çok Önemli — Bu Aşamada Yapma
+
+Bu görevde:
+
+- Bill Flutter entegrasyonu yapma.
+- Bill trend entegrasyonu yapma.
+- Budget için AI özelliği ekleme.
+- RemainingAmount gibi backend'de olmayan finansal değer hesaplama.
+- UsagePercent Flutter'da hesaplama.
+- SpentAmount Flutter'da hesaplama.
+- AlertStatus Flutter'da hesaplama.
+- Backend Budget kodunu değiştirme.
+- New Budget detail endpoint oluşturma.
+- Category CRUD geliştirme.
+- Generic/global state framework ekleme.
+- Premium/subscription ekleme.
+- Notification ekleme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen Flutter dosyaları
+2. Eklenen paket varsa ve nedeni
+3. Budget model yapısı
+4. BudgetService yapısı
+5. Budget state yaklaşımı
+6. Ay/yıl seçim ve filtreleme yaklaşımı
+7. Budget list UI
+8. AlertStatus eşlemesi
+9. UsagePercent >100 davranışı
+10. Empty/loading/error davranışları
+11. Yeni Budget formu
+12. Category seçim yaklaşımı
+13. Duplicate 409 davranışı
+14. Budget update UX'i
+15. Update request sözleşmesi
+16. Budget delete davranışı
+17. Pull-to-refresh davranışı
+18. Dashboard ile cross-screen yaklaşım
+19. Güvenlik kontrolleri
+20. Oluşturulan/güncellenen testler
+21. Önceki Flutter testlerinin durumu
+22. flutter analyze sonucu
+23. flutter test sonucu
+24. Android debug build sonucu
+25. Bilerek geliştirilmemiş özellikler
+26. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

@@ -1,0 +1,22 @@
+# Docker / local secrets
+.env
+.env.*
+!.env.example
+
+# .NET
+backend/**/bin/
+backend/**/obj/
+*.user
+
+# Flutter/Dart
+mobile/.dart_tool/
+mobile/build/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Local AI / tool files
+.claude/
+.artifacts/

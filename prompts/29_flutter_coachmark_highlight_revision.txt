@@ -1,0 +1,410 @@
+Önce PROJECT.md ve docs/DESIGN.md dosyalarını oku.
+
+Ardından mevcut Flutter interactive tutorial/walkthrough implementasyonunu incele.
+
+Manuel emulator testinde mevcut walkthrough UX'inin yetersiz olduğu görüldü.
+
+## Mevcut Problem
+
+Tutorial şu anda gerçek ekranı arka planda gösteriyor ancak:
+
+- tüm ekran belirgin şekilde karartılıyor
+- tutorial popup/card çok büyük
+- ekranın önemli bölümünü kaplıyor
+- anlatılan gerçek UI elemanı highlight edilmiyor
+- kullanıcı hangi butonun/alanın anlatıldığını net göremiyor
+
+Bu nedenle mevcut yapı gerçek bir coach-mark/walkthrough gibi çalışmıyor.
+
+Bu görevde tutorial'ı daha küçük, gerçek UI öğelerini vurgulayan bir coach-mark yapısına revize et.
+
+Backend değiştirme.
+Database değiştirme.
+Yeni API endpoint ekleme.
+Yeni Flutter package ekleme.
+
+---
+
+# 1. Temel UX Hedefi
+
+Tutorial sırasında kullanıcı gerçek uygulama ekranını mümkün olduğunca net görmelidir.
+
+Büyük full-screen modal kullanma.
+
+Tutorial açıklama kartı:
+
+- kompakt olmalı
+- yalnızca gerekli metin ve navigation kontrollerini içermeli
+- mümkünse ekranın alt veya üst bölümünde yer almalı
+- anlatılan UI elemanını kapatmamalı
+
+Arka plan:
+
+- tamamen koyu/gri hale getirilmemeli
+- mümkünse hiç karartılmasın
+- gerekiyorsa sadece çok hafif scrim kullanılabilir
+
+Amaç:
+kullanıcının gerçek ekranı net biçimde görmesi.
+
+---
+
+# 2. Gerçek UI Elemanlarını Highlight Et
+
+Her tutorial adımında anlatılan gerçek UI elemanı görsel olarak vurgulanmalıdır.
+
+Üçüncü parti coach-mark package kullanma.
+
+Mevcut Flutter widget'larıyla sade bir çözüm üret.
+
+Tercih edilen yaklaşım:
+
+- hedef widget'lara GlobalKey ver
+- RenderBox üzerinden ekrandaki position/size bilgisini al
+- Overlay/Stack içinde hedef alanın çevresine belirgin bir border/highlight çiz
+- tutorial kartını hedefi kapatmayacak uygun bölgeye yerleştir
+
+Alternatif olarak mevcut architecture içinde daha güvenilir basit bir highlight yaklaşımı varsa onu kullan.
+
+Ama coordinate değerlerini hard-code etme.
+
+Farklı ekran boyutlarında çalışmalı.
+
+---
+
+# 3. Highlight Görünümü
+
+Hedef alanın çevresinde:
+
+- DESIGN.md primary rengiyle ince border
+- hafif glow veya shadow
+- 8-12 px padding
+- rounded rectangle
+
+kullanılabilir.
+
+Aşırı animasyon yapma.
+
+Highlight edilen UI elemanı ekranın geri kalanından rahatça ayırt edilmelidir.
+
+---
+
+# 4. Arka Plan Scrim
+
+Mevcut güçlü karartmayı kaldır.
+
+Eğer scrim kullanılacaksa:
+
+- çok hafif olmalı
+- gerçek ekran okunabilir kalmalı
+
+İdeal olarak hedeflenen alan tamamen normal/parlak kalmalıdır.
+
+Mümkünse overlay içinde hedef alanın üstüne karartma uygulanmasın.
+
+Ancak karmaşık custom clip çözümü uygulamayı kıracaksa:
+- tüm ekranı karartmak yerine scrim'i minimum seviyede tut
+- target border/highlight ile hedefi belirginleştir
+
+Basitlik ve stabilite önceliklidir.
+
+---
+
+# 5. Tutorial Kart Boyutu
+
+Mevcut büyük modalı küçült.
+
+Tutorial card:
+
+- ekran yüksekliğinin büyük bölümünü kaplamamalı
+- yalnızca başlık + kısa metin + step indicator + navigation kontrollerini içermeli
+
+Önerilen yapı:
+
+Başlık
+1-2 kısa paragraf
+3 / 6
+Geri | İleri
+
+Kartta gereksiz boş alan bırakma.
+
+Özellikle mevcut ekran görüntüsündeki gibi ekranın yaklaşık yarısından fazlasını kaplayan boş beyaz alan olmamalıdır.
+
+Metin uzun gelirse içerik kadar büyüsün.
+
+---
+
+# 6. Step 1 — Dashboard
+
+Gerçek Ana Sayfa gösterilsin.
+
+Highlight:
+mümkünse Dashboard'ın ana finans özet alanı/kartı.
+
+Tutorial text:
+
+"Gelir, gider, bakiye ve bütçe durumunuzu Ana Sayfa üzerinden takip edebilirsiniz."
+
+Kart highlighted alanı kapatmamalıdır.
+
+---
+
+# 7. Step 2 — İşlemler
+
+İşlemler sekmesine geç.
+
+Highlight:
+mevcut "İşlem Ekle" / yeni işlem oluşturma butonu.
+
+Tutorial:
+
+Başlık:
+"Gelir ve Giderlerinizi Ekleyin"
+
+Metin:
+"Gelir ve gider kayıtlarınızı buradan ekleyebilirsiniz."
+
+Kullanıcı gerçek İşlem Ekle butonunu net görmelidir.
+
+---
+
+# 8. Step 3 — AI Kategori Önerisi
+
+İşlemler sekmesinde kal.
+
+AI özelliğinin gerçek kullanım yerine en yakın UI elemanını highlight et.
+
+Tercihen:
+- İşlem Ekle/Gider Ekle butonu
+veya
+- gider oluşturma akışındaki AI kategori önerisi kontrolü, eğer bunu sadece görsel şekilde göstermek güvenli ve kolay ise.
+
+Ama:
+
+- formu otomatik submit etme
+- backend çağrısı yapma
+- AI endpoint çağırma
+- kayıt oluşturma
+
+Tutorial text:
+
+Başlık:
+"AI ile Kategori Önerisi"
+
+Metin:
+"Gider açıklamanıza göre AI'dan kategori önerisi alabilirsiniz. Öneriyi kabul etmek veya değiştirmek sizin kontrolünüzdedir."
+
+Eğer AI kontrolü form açılmadan görünmüyorsa karmaşık state üretme.
+Bu durumda İşlem Ekle butonunu highlight etmek yeterlidir.
+
+---
+
+# 9. Step 4 — Bütçeler
+
+Bütçeler sekmesine geç.
+
+Highlight:
+
+"Yeni Bütçe Ekle"
+
+butonu.
+
+Tutorial:
+
+"Kategorilere aylık bütçe belirleyebilir ve kullanım oranınızı buradan takip edebilirsiniz."
+
+---
+
+# 10. Step 5 — Faturalar
+
+Faturalar sekmesine geç.
+
+Highlight:
+
+"Fatura Ekle"
+
+butonu.
+
+Tutorial:
+
+"Elektrik, su ve doğalgaz faturalarınızı buradan ekleyebilir ve son 6 aylık trendleri takip edebilirsiniz."
+
+---
+
+# 11. Step 6 — AI Aylık Analiz
+
+Ana Sayfa sekmesine dön.
+
+Highlight:
+
+mevcut AI aylık analiz butonu/kartı.
+
+Tutorial:
+
+Başlık:
+"AI Aylık Analizi"
+
+Metin:
+"Aylık finansal verilerinize göre AI harcama analizini istediğiniz zaman buradan çalıştırabilirsiniz."
+
+AI endpoint tutorial sırasında çağrılmamalıdır.
+
+---
+
+# 12. Navigation
+
+Mevcut:
+
+- Geri
+- İleri
+- Atla
+- Başla/Tamamla
+
+davranışlarını koru.
+
+Sekme geçiş mapping'i korunmalıdır.
+
+İleri/Geri ile:
+- doğru sekme açılmalı
+- doğru UI elementi highlight edilmelidir.
+
+Highlight ölçümü sekme değişiminden hemen önce yapılmamalıdır.
+
+Yeni ekran render edildikten sonra hedef position alınmalıdır.
+
+Gerekirse addPostFrameCallback kullan.
+
+---
+
+# 13. `?` Yardım Butonu
+
+Mevcut sağ üst `?` butonu kesinlikle korunmalıdır.
+
+- Tooltip: Yardım
+- authenticated tüm ana sekmelerde erişilebilir
+
+`?` butonuna basılınca walkthrough step 1'den başlamalıdır.
+
+Tutorial zaten açıksa ikinci overlay oluşturma.
+
+---
+
+# 14. Interaction Safety
+
+Tutorial sırasında highlighted element kullanıcıya gösterilmelidir ancak yanlışlıkla gerçek finansal işlem yapılması engellenmelidir.
+
+Tercihen overlay pointer input'u yakalasın.
+
+Yani:
+- highlighted buton görsel olarak görünür
+- fakat kullanıcı tutorial sırasında o butona basıp kayıt akışını yanlışlıkla başlatamaz
+
+Sadece tutorial navigation kontrolleri aktif olabilir.
+
+Ancak teknik olarak mevcut yapıda bu aşırı karmaşıksa en güvenli basit çözümü uygula.
+
+---
+
+# 15. Responsive Davranış
+
+Hard-coded pixel coordinate kullanma.
+
+Target widget konumu gerçek RenderBox üzerinden belirlenmeli veya mevcut layout ile güvenli şekilde ilişkilendirilmelidir.
+
+Kontrol et:
+
+- küçük Android ekran
+- normal Android emulator
+
+Tutorial card:
+- target'ı kapatmamalı
+- ekrandan taşmamalı
+
+Eğer target ekranın altındaysa tutorial card üstte konumlanabilir.
+Target üstteyse card altta konumlanabilir.
+
+Basit automatic positioning mantığı yeterlidir.
+
+---
+
+# 16. Mevcut Tutorial State
+
+Mevcut kullanıcı bazlı tutorialSeen davranışını koru.
+
+- ilk login -> otomatik
+- tamamladıktan sonra tekrar otomatik açılmaz
+- ? -> manuel tekrar açılır
+- farklı kullanıcı -> bağımsız state
+
+Storage davranışını yeniden tasarlama.
+
+---
+
+# 17. Testler
+
+Mevcut walkthrough testlerini güncelle.
+
+En az:
+
+1. Step 1 doğru Dashboard target'ını highlight eder.
+2. Step 2 Transactions tab'a geçer ve İşlem Ekle target'ı vardır.
+3. Step 3 İşlemler tabında kalır ve AI özelliğiyle ilişkili target kullanılır.
+4. Step 4 Budget tab + Yeni Bütçe Ekle target.
+5. Step 5 Bills tab + Fatura Ekle target.
+6. Step 6 Dashboard + AI analysis target.
+7. Geri/İleri target'ları doğru günceller.
+8. Tutorial card compact şekilde render edilir.
+9. ? manual walkthrough açar.
+10. Tutorial sırasında backend write/AI call oluşmaz.
+11. TutorialSeen davranışı bozulmaz.
+
+Coordinate değerlerini birebir pixel assert etme.
+Widget/key/step davranışını test et.
+
+---
+
+# 18. Yapma
+
+- backend değişikliği
+- API değişikliği
+- DB değişikliği
+- migration
+- yeni package
+- hard-coded screen coordinates
+- devasa modal
+- tüm ekranı ağır karartan overlay
+- otomatik finansal kayıt
+- otomatik AI call
+- yeni feature
+- mimari refactor
+
+---
+
+# Son Doğrulama
+
+Çalıştır:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+---
+
+# İş Bitiminde Raporla
+
+1. Değiştirilen dosyalar
+2. Büyük modalın nasıl compact coach-mark yapısına dönüştürüldüğü
+3. Target widget'ların nasıl belirlendiği
+4. Her step'te highlight edilen gerçek UI öğesi
+5. Target konumunun responsive nasıl hesaplandığı
+6. Scrim/karartma davranışının nasıl değiştiği
+7. Tutorial sırasında interaction'ın nasıl engellendiği
+8. ? butonunun korunduğu
+9. Testler
+10. flutter analyze sonucu
+11. flutter test sonucu
+12. APK build sonucu
+13. Emulator üzerinde manuel kontrol edilmesi gereken noktalar
+
+Bu görev dışında yeni özellik veya refactor yapma.

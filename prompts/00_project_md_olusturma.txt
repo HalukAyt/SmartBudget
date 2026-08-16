@@ -1,0 +1,158 @@
+SMARTBUDGET AI — PROJECT.md OLUŞTURMA PROMPTU
+==============================================
+
+Dosya Adı:
+00_project_md_olusturma.txt
+
+Amaç:
+SmartBudget AI projesinde geliştirici ve yapay zekânın proje boyunca uyacağı
+ana context / kurallar dosyası olan PROJECT.md dosyasını oluşturmak.
+
+Kullanılan Kaynak:
+- Proje Görevleri ve Değerlendirme sunumu
+- Seçilen proje: Aile Bütçesi ve Fatura Takibi
+- Proje için belirlenen teknoloji tercihleri
+
+PROMPT
+------
+
+Proje görev dokümanındaki "Aile Bütçesi ve Fatura Takibi" developer projesini
+temel alarak SmartBudget AI isimli bir proje için PROJECT.md dosyası hazırla.
+
+Bu dosya, proje boyunca Codex / ChatGPT gibi yapay zekâ araçlarının okuyacağı
+ana context ve geliştirme kuralları dosyası olacak.
+
+Projenin temel amacı:
+
+- Kullanıcıların gelir ve giderlerini kaydedebilmesi
+- Giderleri kategori bazında takip edebilmesi
+- Kategori bazlı aylık bütçe limiti belirleyebilmesi
+- Bütçe limitine yaklaşıldığında veya limit aşıldığında uyarı verilmesi
+- Elektrik, su ve doğalgaz faturalarının kaydedilmesi
+- Aylık harcama ve tüketim trendlerinin gösterilmesi
+- AI ile harcamaların otomatik kategorize edilmesi
+- AI ile "bu ay nerede harcamalar arttı?" benzeri aylık özet oluşturulması
+
+Teknoloji tercihleri:
+
+Mobile:
+- Flutter
+- Dart
+
+Backend:
+- ASP.NET Core Web API
+- C#
+- Entity Framework Core
+- JWT Authentication
+
+Database:
+- PostgreSQL
+
+AI:
+- LLM API entegrasyonu backend üzerinden yapılacak.
+
+PROJECT.md içerisinde aşağıdaki bölümler bulunsun:
+
+1. Proje Özeti
+2. Projenin Amacı
+3. MVP Kapsamı
+4. Kapsam Dışı
+5. Teknoloji Yığını
+6. Genel Mimari
+7. Mimari Kurallar
+8. Temel Veri Modeli
+9. Temel API Taslağı
+10. AI Harcama Kategorileme Özelliği
+11. AI Aylık Harcama Analizi
+12. AI Güvenlik ve Doğrulama Kuralları
+13. Hata Yönetimi
+14. Business Rules
+15. Güvenlik Kuralları
+16. Test Stratejisi
+17. AI ile Çalışma Kuralları
+18. Codex / AI İçin Çalışma Talimatları
+19. Definition of Done
+20. Proje Teslim Dosyaları
+21. Demo İçin Minimum Akış
+
+Önemli geliştirme kuralları:
+
+- Controller içerisinde business logic yazılmamalı.
+- Business logic Service katmanında bulunmalı.
+- DTO kullanılmalı.
+- Kullanıcı yalnızca kendi verilerine erişebilmeli.
+- UserId request body'sinden güvenilir kabul edilmemeli; authenticated JWT
+  bilgisinden alınmalı.
+- Password düz metin saklanmamalı.
+- API key ve secret değerleri source code içerisinde tutulmamalı.
+- AI çıktısına doğrudan güvenilmemeli.
+- AI response doğrulanmadan database'e yazılmamalı.
+- AI yalnızca önceden tanımlanmış harcama kategorilerinden birini seçebilmeli.
+- AI servisinin çalışmaması uygulamanın temel özelliklerini bozmamalı.
+- AI kategorileme başarısız olursa kullanıcı manuel kategori seçebilmeli.
+- Finansal toplam, yüzde ve trend hesaplamaları AI tarafından değil backend
+  tarafından deterministik şekilde yapılmalı.
+- AI yalnızca hesaplanmış veriyi açıklamak / yorumlamak için kullanılmalı.
+- Kullanıcıya finansal yatırım tavsiyesi verilmemeli.
+- Gereksiz kişisel veriler AI modeline gönderilmemeli.
+- Mevcut çalışan özellikler yeni geliştirmeler sırasında sebepsiz yere
+  değiştirilmemeli.
+
+Önerilen temel entity'ler:
+
+- User
+- Category
+- Expense
+- Income
+- Budget
+- Bill
+
+Önerilen gider kategorileri:
+
+- Market
+- Ulaşım
+- Fatura
+- Eğlence
+- Sağlık
+- Eğitim
+- Kira
+- Diğer
+
+PROJECT.md bir uygulama kodu değildir.
+Bu nedenle implementation kodu üretme.
+
+Dosyanın amacı:
+- kapsamı sabitlemek,
+- mimari kuralları belirlemek,
+- AI'ın proje sırasında kafasına göre özellik eklemesini engellemek,
+- güvenlik ve AI kullanım sınırlarını tanımlamak,
+- geliştirici ile AI için ortak bir source of truth oluşturmaktır.
+
+Belirsiz noktaları kesin gereksinimmiş gibi uydurma.
+Gerekirse bunları "varsayım" veya "opsiyonel" olarak işaretle.
+
+Çıktıyı doğrudan Markdown PROJECT.md formatında üret.
+
+
+İNSAN DENETİMİ / SONRAKİ ADIM
+-----------------------------
+
+AI'ın oluşturduğu PROJECT.md doğrudan kabul edilmemelidir.
+
+İnsan tarafından özellikle şu noktalar kontrol edilmelidir:
+
+1. Proje görev dokümanındaki gereksinimlerle uyumlu mu?
+2. Kapsam gereksiz büyütülmüş mü?
+3. Gerçek banka entegrasyonu gibi kapsam dışı özellikler eklenmiş mi?
+4. AI'a finansal hesap yaptırılıyor mu?
+5. AI response doğrulaması var mı?
+6. AI başarısızlığı için fallback tanımlı mı?
+7. User ownership / authorization kuralları yeterli mi?
+8. API key ve secret güvenliği belirtilmiş mi?
+9. Test ve hata senaryoları düşünülmüş mü?
+10. Kodlama başlamadan önce yeterli bir source of truth oluşturuyor mu?
+
+NOT:
+Bu kayıt, PROJECT.md oluşturma sürecinin izlenebilirliğini sağlamak için
+hazırlanmıştır. Final AI çalışma günlüğünde gerçek insan kontrolleri ve yapılan
+değişiklikler ayrıca belirtilmelidir.

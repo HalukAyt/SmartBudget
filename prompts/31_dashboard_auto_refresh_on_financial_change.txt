@@ -1,0 +1,176 @@
+Önce PROJECT.md, docs/DESIGN.md ve mevcut Flutter mimarisini oku.
+
+Manuel testte gerçek bir UX/state problemi bulundu:
+
+Kullanıcı gelir veya gider eklediğinde/sildiğinde İşlemler ekranı güncelleniyor ancak Ana Sayfa'daki finansal özet eski kalabiliyor.
+
+İstenen davranış:
+
+Gelir veya gider başarıyla:
+- oluşturulduğunda
+- silindiğinde
+
+Dashboard finansal özeti otomatik güncellenmelidir.
+
+Kullanıcı Ana Sayfa'ya döndüğünde:
+- TotalIncome
+- TotalExpense
+- Balance
+- CategoryExpenses
+- BudgetUsages
+- PreviousMonthExpenseChangePercent
+- HighestSpendingCategory
+- HighestIncreaseCategory
+- LastSixMonthsTrend
+
+eski cache/state yerine backend'den güncel veri göstermelidir.
+
+## Önemli Mimari Kural
+
+Finansal hesapları Flutter'da yeniden yapma.
+
+Dashboard refresh:
+GET /api/dashboard/monthly
+
+üzerinden backend'den yeni veriyi çekmelidir.
+
+Yeni global state management package ekleme.
+
+Provider/Riverpod/Bloc gibi yeni package ekleme.
+
+Mevcut ChangeNotifier/MainShell yapısına minimum değişiklik yap.
+
+## Tercih Edilen Yaklaşım
+
+MainShell veya mevcut parent seviyesinde basit bir "financialDataChanged" callback / version / refresh trigger mekanizması kullan.
+
+Örnek mantık:
+
+- Transactions ekranında create/delete başarılı olur
+- parent/MainShell'e `onFinancialDataChanged()` bildirimi yapılır
+- DashboardViewModel refresh tetiklenir veya Dashboard sekmesine dönüldüğünde refresh gerekli olduğu işaretlenir
+
+En küçük ve güvenilir çözümü seç.
+
+Her build'de Dashboard API çağırma.
+
+Gereksiz polling yapma.
+
+## Gelir
+
+Başarılı Income:
+- create
+- delete
+
+sonrası Dashboard stale kalmamalıdır.
+
+## Gider
+
+Başarılı Expense:
+- create
+- delete
+
+sonrası Dashboard stale kalmamalıdır.
+
+AI kategori önerisi tek başına finansal kayıt oluşturmadığı için Dashboard refresh tetiklememelidir.
+
+Yalnız Expense gerçekten başarıyla oluşturulduğunda refresh tetiklenmelidir.
+
+## Budget Etkisi
+
+Expense değişikliği BudgetUsages değerini de etkileyebileceği için Dashboard tam olarak backend'den yeniden yüklenmelidir.
+
+Sadece TotalExpense alanını local olarak değiştirme.
+
+## Refresh Zamanlaması
+
+Tercihen finansal mutation başarıyla tamamlandıktan sonra Dashboard refresh çağrısı tetiklensin.
+
+Eğer Dashboard o anda görünür değilse:
+- background refresh yapılabilir
+veya
+- Dashboard sekmesine dönüldüğünde tek sefer refresh yapılabilir.
+
+Mevcut mimari için en sade yaklaşımı seç.
+
+Ancak kullanıcı Dashboard'a döndüğünde eski değerleri görmemelidir.
+
+## Loading UX
+
+Gelir/gider kaydı oluşturulurken mevcut form loading davranışını bozma.
+
+Dashboard refresh başarısız olursa:
+- başarılı Expense/Income kaydını başarısız sayma
+- mutation başarılı kalmalı
+- Dashboard kendi mevcut error/refresh davranışını kullanmalı
+
+Bir Dashboard refresh hatası yüzünden kullanıcıya "gider eklenemedi" gibi yanlış mesaj gösterme.
+
+## Duplicate API Calls
+
+Aynı başarılı mutation için gereksiz yere Dashboard endpointini birkaç kez çağırma.
+
+Navigation rebuild nedeniyle sonsuz refresh loop oluşturma.
+
+## Mevcut İşlevleri Bozma
+
+Şunları koru:
+- Income CRUD
+- Expense CRUD
+- AI categorization
+- Dashboard manual refresh
+- Dashboard period selection
+- bottom navigation
+- auth/session
+- mevcut tests
+
+## Regression Tests
+
+En az şu davranışları test et:
+
+1. Expense create başarılı -> Dashboard refresh trigger oluşur.
+2. Income create başarılı -> Dashboard refresh trigger oluşur.
+3. Expense delete başarılı -> Dashboard refresh trigger oluşur.
+4. Income delete başarılı -> Dashboard refresh trigger oluşur.
+5. Expense create başarısız -> Dashboard refresh tetiklenmez.
+6. AI category suggestion tek başına -> Dashboard refresh tetiklenmez.
+7. Dashboard refresh başarısız olsa bile başarılı financial mutation geri alınmaz / yanlış hata gösterilmez.
+8. Dashboard'a dönüldüğünde güncel backend verisi render edilebilir.
+9. Gereksiz duplicate refresh oluşmaz.
+
+Mevcut fake/test infrastructure kullan.
+
+## Yapma
+
+- backend değiştirme
+- API contract değiştirme
+- finansal hesapları Flutter'a taşıma
+- yeni state management package
+- polling
+- timer refresh
+- her frame/build'de API çağrısı
+- büyük refactor
+
+## Son Doğrulama
+
+Çalıştır:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+## İş Bitiminde Raporla
+
+1. Root cause
+2. Değiştirilen dosyalar
+3. Financial mutation -> Dashboard refresh akışı
+4. Hangi create/delete işlemlerinin refresh tetiklediği
+5. AI suggestion'ın neden tetiklemediği
+6. Duplicate refresh'in nasıl önlendiği
+7. Eklenen/değiştirilen testler
+8. flutter analyze sonucu
+9. flutter test sonucu
+10. APK build sonucu
+
+Bu görev dışında yeni feature/refactor yapma.

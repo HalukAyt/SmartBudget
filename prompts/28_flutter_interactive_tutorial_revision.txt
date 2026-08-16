@@ -1,0 +1,603 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut Flutter tutorial/onboarding implementasyonunu incele.
+
+Bu görev yeni tutorial sistemi yazmak değil, mevcut tutorial'ı daha kullanışlı bir interaktif walkthrough yapısına revize etmektir.
+
+Mevcut sağ üst `?` yardım butonu KORUNACAKTIR.
+
+Backend değiştirme.
+Database değiştirme.
+Yeni API endpoint oluşturma.
+Yeni Flutter package ekleme.
+
+# Problem
+
+Mevcut tutorial ayrı onboarding sayfaları şeklinde ilerliyor.
+
+Örneğin:
+
+"Gelir ve Giderlerinizi Ekleyin"
+
+adımında kullanıcı yalnızca açıklama metnini görüyor, fakat anlatılan gerçek İşlemler ekranını görmüyor.
+
+Bu kullanıcı açısından daha az öğretici.
+
+İstenen yeni davranış:
+
+Tutorial, mümkün olduğunca uygulamanın gerçek ekranlarını göstererek ilerleyen interaktif bir walkthrough olmalıdır.
+
+Kullanıcı "İleri" dediğinde ilgili gerçek sekmeye geçilmeli ve o ekran üzerinde açıklayıcı bir tutorial kartı/overlay gösterilmelidir.
+
+# Temel Yaklaşım
+
+Tutorial sırasında:
+
+- gerçek MainShell kullanılmaya devam etsin
+- bottom navigation ve gerçek ekranlar arka planda görünsün
+- tutorial açıklaması modal/overlay/card şeklinde gerçek ekranın üzerinde gösterilsin
+- kullanıcı gerçek ekranın yapısını görebilsin
+- "İleri" ile gerekli sekmeye otomatik geçilsin
+
+Tutorial sırasında hiçbir finansal kayıt otomatik oluşturulmasın.
+
+Backend write yapılmasın.
+
+AI endpointleri otomatik çağrılmasın.
+
+# Tutorial Akışı
+
+## Adım 1 — Ana Sayfa
+
+Gerçek Ana Sayfa sekmesini göster.
+
+Tutorial açıklaması:
+
+Başlık:
+"SmartBudget AI'ye Hoş Geldiniz"
+
+Metin:
+"Gelir, gider, bakiye ve bütçe durumunuzu Ana Sayfa üzerinden takip edebilirsiniz."
+
+Bu adımda Dashboard gerçek ekran olarak arka planda görünmelidir.
+
+---
+
+## Adım 2 — İşlemler
+
+Kullanıcı "İleri" dediğinde MainShell otomatik olarak:
+
+İşlemler
+
+sekmesine geçsin.
+
+Gerçek İşlemler ekranı görünürken tutorial açıklaması göster:
+
+Başlık:
+"Gelir ve Giderlerinizi Ekleyin"
+
+Metin:
+"Gelir ve gider kayıtlarınızı buradan ekleyebilir, geçmiş işlemlerinizi görüntüleyebilirsiniz."
+
+Mümkünse mevcut UI'yi bozmadan:
+
+- Yeni İşlem / Yeni Gider / ekleme butonunun bulunduğu bölgeyi görsel olarak hafif vurgula
+
+ancak bunu yapmak için karmaşık overlay sistemi veya yeni package ekleme.
+
+Basit ve güvenilir implementation tercih et.
+
+---
+
+## Adım 3 — AI Kategori Önerisi
+
+Bu adımda kullanıcı yine İşlemler alanını görmelidir.
+
+Tercihen gider ekleme özelliğinin bulunduğu bölüm görünür kalsın.
+
+Tutorial açıklaması:
+
+Başlık:
+"AI ile Kategori Önerisi"
+
+Metin:
+"Gider açıklamanıza göre AI'dan kategori önerisi alabilirsiniz. Öneriyi kabul etmek veya değiştirmek her zaman sizin kontrolünüzdedir."
+
+ÇOK ÖNEMLİ:
+
+- gider formunu otomatik submit etme
+- AI endpointini otomatik çağırma
+- fake AI sonucu gösterme
+- otomatik kategori seçme
+- database'e kayıt oluşturma
+
+Tutorial yalnızca özelliğin nerede ve nasıl kullanılacağını anlatmalıdır.
+
+Eğer gerçek add-expense formunu güvenli ve kolay şekilde yalnızca görsel amaçla açmak mevcut mimaride çok karmaşıksa zorla açma.
+
+Bu durumda İşlemler ekranını göster ve açıklama kartıyla AI özelliğini anlat.
+
+---
+
+## Adım 4 — Bütçeler
+
+"İleri" dediğinde:
+
+Bütçeler
+
+sekmesine otomatik geç.
+
+Gerçek Bütçeler ekranı arka planda görünsün.
+
+Tutorial:
+
+Başlık:
+"Bütçenizi Kontrol Edin"
+
+Metin:
+"Kategorilere aylık bütçe belirleyebilir, harcama oranınızı ve bütçe uyarılarınızı buradan takip edebilirsiniz."
+
+Yeni Bütçe Ekle butonu mevcut ekranda görünüyorsa mümkün olduğunca görünür bırak.
+
+Tutorial nedeniyle bütçe oluşturma ekranını otomatik açma.
+
+---
+
+## Adım 5 — Faturalar
+
+"İleri" dediğinde:
+
+Faturalar
+
+sekmesine otomatik geç.
+
+Gerçek Faturalar ekranı arka planda görünsün.
+
+Tutorial:
+
+Başlık:
+"Faturalarınızı Takip Edin"
+
+Metin:
+"Elektrik, su ve doğalgaz faturalarınızı kaydedebilir ve son 6 aylık tutar ve tüketim trendlerini buradan inceleyebilirsiniz."
+
+AI bill prediction gibi uygulamada olmayan özelliklerden bahsetme.
+
+Fatura oluşturma formunu otomatik açma.
+
+---
+
+## Adım 6 — Ana Sayfa / AI Aylık Analiz
+
+Son adımda tekrar:
+
+Ana Sayfa
+
+sekmesine dön.
+
+Gerçek Dashboard görünür olsun.
+
+Tutorial:
+
+Başlık:
+"AI Aylık Analizi"
+
+Metin:
+"Aylık finansal verilerinize göre AI harcama analizini istediğiniz zaman Ana Sayfa üzerinden çalıştırabilirsiniz."
+
+AI analizinin otomatik çalıştığını ima etme.
+
+AI endpointini tutorial sırasında çağırma.
+
+Son buton:
+
+"Başla"
+
+veya mevcut tasarımla uyumlu benzer bir ifade.
+
+---
+
+# Tutorial Navigation
+
+Tutorial kontrolleri korunmalıdır:
+
+- Geri
+- İleri
+- Atla
+- son adımda Başla/Tamamla
+
+Davranış:
+
+## İleri
+
+Bir sonraki tutorial adımına geç.
+
+Eğer sonraki adım başka bir MainShell sekmesine aitse sekmeyi otomatik değiştir.
+
+## Geri
+
+Önceki tutorial adımına dön.
+
+Önceki adım farklı bir sekmedeyse ilgili sekmeye geri dön.
+
+Örneğin:
+
+Faturalar
+→ Geri
+→ Bütçeler
+
+gerçekten Bütçeler sekmesini göstermelidir.
+
+## Atla
+
+Tutorial kapanır.
+
+İlk giriş tutorial'ı ise görülmüş olarak kaydedilir.
+
+MainShell kullanılabilir halde kalır.
+
+## Başla / Tamamla
+
+Tutorial kapanır.
+
+Tutorial görülmüş olarak kaydedilir.
+
+Tercihen Ana Sayfa sekmesinde bırak.
+
+---
+
+# `?` Yardım Butonu KORUNACAK
+
+Mevcut sağ üst:
+
+`?`
+
+yardım butonu kaldırılmamalıdır.
+
+Icon:
+
+Icons.help_outline
+
+veya mevcut implementasyondaki yardım ikonu korunabilir.
+
+Tooltip:
+
+"Yardım"
+
+Bu buton authenticated ana ekranlarda mevcut konumunda kalmalıdır.
+
+En az:
+
+- Ana Sayfa
+- İşlemler
+- Bütçeler
+- Faturalar
+- Profil
+
+ekranlarında erişilebilir olmalıdır.
+
+`?` butonuna basıldığında interaktif walkthrough baştan açılmalıdır.
+
+Manual tutorial açılışında:
+
+- tutorialSeen state sıfırlanmasın
+- backend çağrısı yapılmasın
+- logout/login state etkilenmesin
+- kullanıcı istediği kadar yeniden açabilsin
+
+---
+
+# Tutorial Sırasında `?` Butonu
+
+Tutorial zaten açıksa ikinci kez tutorial başlatılmamalıdır.
+
+Gerekirse tutorial aktifken `?` butonunun yeni walkthrough başlatmasını engelle.
+
+Double-dialog / stacked overlay oluşmamalıdır.
+
+---
+
+# Gerçek Ekranların Kullanılması
+
+Tutorial'ın amacı gerçek uygulama ekranlarını öğretmektir.
+
+Bu nedenle mevcut ayrı onboarding page görünümünü mümkün olduğunca kaldır veya walkthrough yapısına dönüştür.
+
+Tutorial kartı:
+
+- gerçek ekranın üstünde
+- ekran içeriğini tamamen kapatmayacak şekilde
+- alt veya orta bölgede
+- DESIGN.md ile uyumlu
+
+gösterilebilir.
+
+Kullanıcı anlatılan ekranın gerçekten nasıl göründüğünü görebilmelidir.
+
+Tam ekran beyaz tutorial sayfası kullanma, eğer altında gerçek ekranı göstermeyi engelliyorsa.
+
+---
+
+# Overlay / Interaction Davranışı
+
+Tutorial sırasında kullanıcı yanlışlıkla kayıt oluşturmasın.
+
+Tutorial overlay aktifken arka plandaki kritik butonlara basılmasını engellemek tercih edilir.
+
+Ancak bottom navigation'ı kullanıcıdan tamamen bağımsız bırakmak daha güvenlidir; tutorial kendi sekme geçişlerini kontrol etsin.
+
+Basit yaklaşım tercih et:
+
+- modal barrier
+- mevcut ekran görünür
+- tutorial card üstte
+- navigation tutorial tarafından yönetilir
+
+Karmaşık coordinate-based coach-mark sistemi geliştirme.
+
+Yeni üçüncü parti package ekleme.
+
+---
+
+# MainShell ile Entegrasyon
+
+Mevcut MainShell / IndexedStack yapısını bozma.
+
+Tutorial hangi adımın hangi sekmeye karşılık geldiğini açık bir mapping ile yönetebilir.
+
+Örnek mantık:
+
+Step 0 -> Dashboard index
+Step 1 -> Transactions index
+Step 2 -> Transactions index
+Step 3 -> Budgets index
+Step 4 -> Bills index
+Step 5 -> Dashboard index
+
+Mevcut gerçek tab index değerlerini koddan doğrula, tahmin etme.
+
+Tutorial step değiştiğinde gerekli index'i seç.
+
+Bottom navigation state ile ekran state'i senkron kalmalıdır.
+
+---
+
+# İlk Login Davranışı KORUNACAK
+
+Mevcut tutorialSeen mekanizmasını bozma.
+
+İlk başarılı authenticated login:
+
+- tutorial görülmemişse walkthrough otomatik açılır
+
+Daha önce görülmüşse:
+
+- otomatik açılmaz
+
+Aynı kullanıcı logout/login:
+
+- tutorial otomatik tekrar açılmaz
+
+Yeni kullanıcı:
+
+- kendi tutorial state'ine göre ilk kez görür
+
+Mevcut kullanıcı bazlı `tutorial_seen_v1_*` veya mevcut implementation ne kullanıyorsa mümkün olduğunca koru.
+
+Backend'e onboarding state yazma.
+
+---
+
+# Manual Reopen
+
+Kullanıcı daha önce tutorial'ı tamamlamış olsa bile:
+
+`?`
+
+butonuna bastığında walkthrough Adım 1'den başlamalıdır.
+
+Manual reopen tutorialSeen değerini değiştirmek zorunda değildir.
+
+Tutorial kapandığında normal uygulama kullanımına dönülmelidir.
+
+---
+
+# Profil Sekmesi
+
+Profil tutorial'ın ana eğitim adımlarından biri olmak zorunda değildir.
+
+Ancak Profil ekranındaki `?` butonu korunmalıdır.
+
+Profilde `?` basılırsa walkthrough baştan başlayıp Ana Sayfa ekranına geçebilir.
+
+Bu beklenen davranıştır.
+
+---
+
+# UI / DESIGN
+
+docs/DESIGN.md kurallarını koru.
+
+Tutorial card:
+
+- mevcut surface rengi
+- mevcut radius
+- mevcut typography
+- mevcut primary button tasarımı
+
+ile uyumlu olmalıdır.
+
+Aşırı büyük modal kullanma.
+
+Ekranın tamamını gereksiz yere kapatma.
+
+Küçük Android ekranlarında:
+
+- metin taşmamalı
+- butonlar erişilebilir olmalı
+- gerekirse tutorial card içeriği scroll edebilmeli
+
+Emoji kullanma.
+
+---
+
+# Progress Indicator
+
+Mevcut progress indicator varsa koru veya walkthrough'a adapte et.
+
+Örneğin:
+
+1 / 6
+2 / 6
+...
+
+veya mevcut dot indicator.
+
+Yeni package ekleme.
+
+---
+
+# Accessibility
+
+`?` butonu:
+
+- Tooltip: Yardım
+- semantic olarak erişilebilir
+
+Tutorial navigation butonları anlaşılır label'lara sahip olmalı.
+
+Metin contrast'ı DESIGN.md ile uyumlu olmalı.
+
+---
+
+# Testler
+
+Mevcut tutorial testlerini walkthrough davranışına göre revize et.
+
+En az aşağıdakileri doğrula:
+
+1. İlk authenticated kullanıcıda walkthrough otomatik açılır.
+
+2. İlk adımda Dashboard sekmesi aktiftir.
+
+3. İlk "İleri":
+   - Transactions/İşlemler sekmesine geçer
+   - ilgili tutorial metni görünür.
+
+4. AI kategori adımında:
+   - İşlemler sekmesinde kalınır
+   - AI endpoint çağrısı yapılmaz
+   - finansal kayıt oluşturulmaz.
+
+5. Sonraki "İleri":
+   - Bütçeler sekmesine geçer.
+
+6. Sonraki:
+   - Faturalar sekmesine geçer.
+
+7. Son adım:
+   - Dashboard'a döner.
+
+8. Geri butonu:
+   - yalnızca metin adımını değil gerekli sekmeyi de geri değiştirir.
+
+9. Atla:
+   - walkthrough kapanır
+   - ilk açılış ise tutorialSeen kaydedilir.
+
+10. Başla/Tamamla:
+   - walkthrough kapanır
+   - tutorialSeen kaydedilir.
+
+11. Daha önce tutorial görmüş kullanıcıda otomatik açılmaz.
+
+12. `?` butonu tutorial'ı manuel olarak yeniden açar.
+
+13. Profil dahil ana sekmelerden `?` butonu kullanılabilir.
+
+14. Manual reopen sonrası tutorialSeen state bozulmaz.
+
+15. Tutorial aktifken `?` tekrar basılması ikinci overlay oluşturmaz.
+
+16. Tutorial sırasında backend write çağrısı oluşmaz.
+
+Mevcut fake/test infrastructure kullan.
+
+Gerçek backend gerektirme.
+
+---
+
+# Mevcut İşlevleri Bozma
+
+Şunlara dokunma:
+
+- Auth API
+- Register/Login
+- JWT
+- Secure token storage
+- Dashboard backend data
+- Expense/Income CRUD
+- AI categorize endpoint davranışı
+- Budget CRUD
+- Bill CRUD
+- Bill trends
+- AI monthly summary
+- Profile logout
+- bottom navigation temel yapısı
+
+Tutorial yalnızca client-side yardım/onboarding concern olarak kalmalıdır.
+
+---
+
+# Yapma
+
+- backend değişikliği
+- PostgreSQL değişikliği
+- migration
+- yeni API endpoint
+- yeni AI feature
+- fake finansal veri
+- tutorial sırasında otomatik kayıt
+- otomatik AI request
+- üçüncü parti tutorial package
+- büyük MainShell refactor
+- yeni navigation package
+- yeni state management package
+- analytics/telemetry
+- premium/subscription
+
+---
+
+# Son Doğrulama
+
+Çalıştır:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+---
+
+# İş Bitiminde Raporla
+
+1. Değiştirilen/eklenen dosyalar
+2. Eski tutorial yapısından ne değişti
+3. Walkthrough adımları ve karşılık gelen gerçek sekmeler
+4. MainShell sekme geçişlerinin nasıl yönetildiği
+5. `?` yardım butonunun korunduğunun doğrulanması
+6. Manual reopen davranışı
+7. TutorialSeen state davranışı
+8. Tutorial sırasında backend write/AI çağrısı yapılmadığının doğrulanması
+9. Eklenen/değiştirilen testler
+10. flutter analyze sonucu
+11. flutter test sonucu
+12. Android debug build sonucu
+13. Manuel emulator üzerinde kontrol edilmesi gereken UI noktaları
+
+Bu görev dışında yeni feature veya refactor yapma.

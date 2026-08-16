@@ -1,0 +1,70 @@
+Mevcut SmartBudget AI mobil tasarımını ve design system'i aynen koru.
+
+Yalnızca aşağıdaki iki backend uyumsuzluğunu düzelt.
+
+Yeni ekran veya özellik üretme.
+
+## 1. Fatura Trendleri
+
+Fatura Trendleri ekranındaki:
+
+- "Tahmini Gelecek Fatura"
+- "AI Öngörüsü"
+- gelecek fatura tahmini
+- AI tarafından hesaplanan geleceğe yönelik tutar
+
+alanlarını tamamen kaldır.
+
+SmartBudget AI backend'inde fatura tahmini veya gelecekteki fatura tutarı için AI özelliği bulunmamaktadır.
+
+Bu ekran yalnızca son 6 ay için backend tarafından hesaplanan:
+
+- aylık toplam fatura tutarı
+- aylık tüketim
+
+verilerini göstermelidir.
+
+Sekmeler yalnızca:
+
+- Elektrik
+- Su
+- Doğalgaz
+
+olmalıdır.
+
+Mevcut grafik tasarımını koru.
+
+## 2. Profil
+
+Profil ekranındaki:
+
+"Hesap Ayarları"
+
+satırını kaldır.
+
+Backend'de hesap ayarlarını değiştiren bir MVP endpointi bulunmamaktadır.
+
+Profil ekranında yalnızca:
+
+- kullanıcının email adresi
+- Çıkış Yap
+
+bulunmalıdır.
+
+Bottom navigation korunmalıdır.
+
+## Çok Önemli
+
+Başka hiçbir ekranı veya design system'i değiştirme.
+
+Şunları ekleme:
+
+- yeni AI özelliği
+- fatura tahmini
+- profil ayarı
+- bildirim
+- üyelik/premium
+- ödeme durumu
+- yeni backend gerektiren herhangi bir özellik
+
+Revizyon sonunda yalnızca bu iki uyumsuzluk düzeltilmiş olmalıdır.

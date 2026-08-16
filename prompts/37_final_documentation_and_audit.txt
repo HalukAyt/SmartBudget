@@ -1,0 +1,433 @@
+Bu görev SmartBudget AI projesinin FINAL DOKÜMANTASYON ve AUDIT aşamasıdır.
+
+Yeni feature geliştirme.
+Mevcut çalışan business logic'i değiştirme.
+Gereksiz refactor yapma.
+Migration oluşturma.
+
+Önce baştan sona oku:
+
+- PROJECT.md
+- README.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/AI_CALISMA_GUNLUGU.md
+- docs/DESIGN.md
+
+Ayrıca prompts/00 ile prompts/36 arasındaki dosyaları incele.
+
+Özellikle mevcut kodda gerçekten uygulanmış son özellikleri doğrula:
+
+- Authentication
+- Income / Expense
+- Category
+- Budget
+- Bills
+- Bill -> Expense synchronization
+- Dashboard
+- AI Expense Categorization
+- AI Monthly Analysis
+- Flutter tutorial / coach marks
+- Dashboard auto refresh
+- recurring financial records
+- automatic recurring realization
+- Europe/Istanbul midnight scheduling
+- startup catch-up
+- recurring Income / Expense / fixed Bill
+- unknown amount Bill manual realization
+- recurring planned vs actual ayrımı
+
+Dokümanları yalnız mevcut gerçek implementasyona göre güncelle.
+
+Tahmin veya olmayan özellik yazma.
+
+--------------------------------------------------
+
+1. PROMPT 35 DOSYASINI DÜZELT
+
+Mevcut:
+
+prompts/35_recurring_auto_realization.txt
+
+dosyasının yanlış encoding/kopya içerik problemi olduğu raporlandı.
+
+Bu dosyayı UTF-8 olarak düzelt.
+
+İçeriği gerçek insan revizyonunu yansıtmalıdır:
+
+- Income/Expense recurring otomatik realization
+- fixed Bill otomatik realization
+- unknown amount Bill due/manual
+- hosted BackgroundService
+- Europe/Istanbul
+- StartDate.Day recurrence day
+- 29/30/31 short month davranışı
+- startup catch-up
+- no Hangfire/Quartz
+- no fake future actuals
+- planned != actual
+
+Geçmişte gerçekten verilen kararları koru.
+Yeni karar icat etme.
+
+prompts/36 dosyasına dokunma; o gece yarısı scheduling revizyonudur.
+
+--------------------------------------------------
+
+2. AI ÇALIŞMA GÜNLÜĞÜ
+
+docs/AI_CALISMA_GUNLUGU.md şu an eski olabilir.
+
+Eksik gerçek geliştirmeleri geriye dönük ama dürüst şekilde ekle.
+
+Uydurma hata veya insan müdahalesi üretme.
+
+Kod/prompt geçmişinden doğrulayabildiğin olayları yaz.
+
+Özellikle aşağıdakileri kapsa:
+
+- Budget PostgreSQL EF translation bug
+- Dashboard trend empty-state
+- Bill trend empty-state
+- Tutorial / interactive walkthrough
+- coach-mark highlight revisions
+- tutorial AI target fix
+- Dashboard auto refresh
+- AI monthly summary user-friendly output revision
+- Bill -> Expense synchronization
+- recurring financial records
+- Codex token limiti sonrası Claude Code'a geçiş
+- recurring manual realization tasarımının insan tarafından reddedilmesi
+- automatic realization revision
+- hourly polling davranışının insan tarafından reddedilmesi
+- Europe/Istanbul midnight scheduler revision
+
+Her entry mümkün olduğunca şu yapıyı kullansın:
+
+- Tarih
+- Amaç / problem
+- Kullanılan AI aracı
+- AI önerisi / uygulaması
+- İnsan incelemesi / kararı
+- Yapılan revizyon
+- Doğrulama / test sonucu
+
+Önemli:
+AI çalışma günlüğü "AI her şeyi doğru yaptı" gibi görünmemelidir.
+Gerçek insan kararlarını açıkça göster.
+
+--------------------------------------------------
+
+3. ANALIZ.md FINAL
+
+docs/ANALIZ.md dosyasını mevcut ürün davranışına göre final hale getir.
+
+Kapsaması gerekenler:
+
+- problem tanımı
+- hedef kullanıcı
+- functional requirements
+- non-functional requirements
+- güvenlik
+- planned vs actual
+- recurring records
+- automatic recurrence
+- bills
+- budgets
+- AI categorization
+- AI monthly analysis
+- error/fallback davranışları
+- timezone
+- MVP sınırları
+
+Recurring için açıkça:
+
+Planlanan recurring kayıtlar gelecekteki actual finansal kayıtları topluca oluşturmaz.
+
+Income/Expense/fixed Bill:
+due olduğunda backend tarafından otomatik gerçekleştirilir.
+
+Unknown amount Bill:
+due olarak kalır, kullanıcı gerçek tutarı girer.
+
+Dashboard yalnız gerçek finansal kayıtlardan hesaplanır.
+
+--------------------------------------------------
+
+4. TEKNIK_MIMARI_TASLAK.md FINAL
+
+Güncel backend mimarisini yaz.
+
+Entity ilişkilerini güncelle:
+
+User
+Category
+Expense
+Income
+Budget
+Bill
+RecurringFinancialRule
+RecurringOccurrence
+
+Bill -> Expense ilişkisinin açıklamasını koru.
+
+Recurring mimarisini açıkla:
+
+RecurringFinancialRule
+    |
+    +--> RecurringOccurrence
+    |
+    +--> actual Income / Expense / Bill
+
+CreatedRecordId polymorphic reference yaklaşımı varsa doğru şekilde açıkla.
+
+Background hosted service'i açıkla:
+
+startup catch-up
++
+next Europe/Istanbul midnight
++
+automatic realization
+
+Hosted service yalnız scheduling sarmalayıcısı,
+business logic RecurringRuleService'te kalır.
+
+RecurrenceDateHelper ve RecurringScheduleHelper rollerini yaz.
+
+Double counting olmadığını açıkla.
+
+--------------------------------------------------
+
+5. API ENDPOINT DOKÜMANTASYONU
+
+Mevcut controller'lardan endpoint listesini çıkar.
+
+Endpointleri koddan doğrula.
+
+Auth
+Categories
+Expenses
+Incomes
+Budgets
+Bills
+Dashboard
+AI
+RecurringRules
+
+Her endpoint için kısa:
+
+METHOD
+PATH
+AMAÇ
+AUTH
+
+yaz.
+
+Olmayan endpoint icat etme.
+
+--------------------------------------------------
+
+6. USER GUIDE
+
+Yeni oluştur:
+
+docs/KULLANICI_KILAVUZU.md
+
+Türkçe ve teknik olmayan kullanıcıya yönelik olsun.
+
+Bölümler:
+
+- Uygulamaya kayıt
+- Giriş
+- Dashboard
+- Gelir ekleme
+- Gider ekleme
+- AI kategori önerisi
+- Bütçe oluşturma
+- Fatura ekleme
+- Fatura trendleri
+- Tekrarlayan gelir
+- Tekrarlayan gider
+- Tekrarlayan fatura
+- Planlananlar
+- Otomatik gerçekleşme
+- Tutarı bilinmeyen faturayı girme
+- Aylık AI analizi
+- Tutorial'ı tekrar açma
+- Çıkış
+
+Özellikle kullanıcıya şunu anlaşılır anlat:
+
+"Her ayın 16'sı" seçilen bir maaş için kullanıcı her ay butona basmaz.
+Backend zamanı geldiğinde otomatik oluşturur.
+
+--------------------------------------------------
+
+7. README FINAL
+
+README.md güncellensin.
+
+İçersin:
+
+- proje özeti
+- teknoloji stack
+- klasör yapısı
+- gereksinimler
+- PostgreSQL setup
+- dotnet user-secrets ile config
+- AI key configuration
+- backend çalıştırma
+- Flutter çalıştırma
+- Android emulator base URL
+- migration
+- test komutları
+- build komutları
+- güvenlik notları
+
+GERÇEK secret yazma.
+
+Örnek placeholder kullan:
+
+<YOUR_JWT_KEY>
+<YOUR_OPENAI_API_KEY>
+<YOUR_CONNECTION_STRING>
+
+--------------------------------------------------
+
+8. SECURITY AUDIT
+
+Kod ve dokümanlarda ara:
+
+- JWT key
+- OpenAI API key
+- PostgreSQL password
+- connection string credentials
+- Bearer token
+- gerçek test kullanıcı credential
+
+Gerçek secret bulursan içeriğini raporda YAZMA.
+
+Sadece:
+
+"secret bulundu: <dosya>"
+
+gibi konum bildir.
+
+Kod içindeki placeholder/empty config secret sayılmasın.
+
+UserId request DTO'larında bulunmadığını doğrula.
+
+Ownership 404 davranışını doğrula.
+
+--------------------------------------------------
+
+9. FINAL TEST AUDIT
+
+Çalıştır:
+
+Backend:
+dotnet build
+dotnet test
+
+Flutter:
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+Migration listesini kontrol et.
+
+Development database'e destructive işlem yapma.
+
+--------------------------------------------------
+
+10. TEST SAYILARINI DOKÜMANA DOĞRU YAZ
+
+Eski AI loglarda/test dokümanlarında farklı sayılar olabilir.
+
+Final dokümanlarda yalnız son gerçek komut çıktısını esas al.
+
+Eski log entry'lerini tarihsel kayıt oldukları için değiştirme.
+
+Ancak final summary'de güncel toplamı ayrıca belirt.
+
+--------------------------------------------------
+
+11. DEMO SENARYOSU
+
+Yeni oluştur:
+
+docs/DEMO_SENARYOSU.md
+
+Toplam yaklaşık 5 dakika.
+
+Happy path:
+
+1. Login
+2. Dashboard
+3. Tekrarlayan maaş göster
+4. Gider + AI kategori önerisi
+5. Budget
+6. Bill
+7. Bill -> Expense etkisini Dashboard'da göster
+8. AI monthly analysis
+9. Planlanan vs gerçekleşen mantığını göster
+
+Ayrıca 1 hata senaryosu:
+
+örneğin duplicate budget / validation / unknown amount Bill
+
+Demo sırasında hangi teknik kararların söyleneceğini de kısa notlarla ekle.
+
+--------------------------------------------------
+
+12. FINAL PROJECT AUDIT RAPORU
+
+Yeni oluştur:
+
+docs/FINAL_AUDIT.md
+
+İçersin:
+
+- tamamlanan requirements
+- eksik/opsiyonel requirements
+- backend test sonucu
+- Flutter test sonucu
+- analyze sonucu
+- APK sonucu
+- migration listesi
+- security audit
+- bilinen MVP limitleri
+- manual emulator'da kontrol edilmesi gerekenler
+
+--------------------------------------------------
+
+13. SCOPE
+
+Yeni feature EKLEME.
+
+Kod değişikliği yalnız:
+
+- gerçek bir documentation/security/test hatası yüzünden kesin gerekli ise
+
+yapılabilir.
+
+Business behavior değiştirme.
+
+--------------------------------------------------
+
+İŞ BİTİMİNDE RAPORLA
+
+1. Güncellenen dokümanlar
+2. Yeni dokümanlar
+3. AI log'a eklenen entry numaraları
+4. prompt 35 encoding/content durumu
+5. Final backend test sonucu
+6. Final Flutter test sonucu
+7. flutter analyze
+8. APK build
+9. Security audit sonucu
+10. Güncel migration listesi
+11. Tespit edilen dokümantasyon tutarsızlıkları
+12. Kod değişikliği yapıldıysa neden
+13. Manuel olarak bizim kontrol etmemiz gerekenler

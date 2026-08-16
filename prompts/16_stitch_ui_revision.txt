@@ -1,0 +1,305 @@
+Mevcut SmartBudget AI mobil tasarımlarını koruyarak yalnızca aşağıdaki uyumsuzlukları düzelt.
+
+Genel design system, renkler, spacing, kart dili, bottom navigation ve mevcut başarılı ekranların görsel stilini değiştirme.
+
+Bu bir UI revizyonudur; yeni ürün özellikleri üretme.
+
+## Backend ile uyumlu kesin özellikler
+
+SmartBudget AI MVP şu özelliklere sahiptir:
+
+- Email + şifre ile Login/Register
+- Gelir kaydı
+- Gider kaydı
+- AI gider kategorisi önerisi
+- Kategori bazlı aylık bütçe
+- Elektrik / Su / Doğalgaz faturaları
+- Son 6 aylık fatura/tüketim trendleri
+- Dashboard
+- AI aylık finansal yorum
+
+Bunun dışında backend'de olmayan özellikleri UI'a ekleme.
+
+## 1. Register ekranını düzelt
+
+Google login ve Apple login seçeneklerini kaldır.
+
+Sadece:
+
+- E-posta
+- Şifre
+- Şifre Tekrar
+- Hesap Oluştur
+- Giriş Yap
+
+kalsın.
+
+Backend yalnızca email/password authentication destekliyor.
+
+## 2. Kullanıcı adı kullanımını kaldır
+
+Backend'de kullanıcı adı / ad-soyad alanı bulunmuyor.
+
+Dashboard üzerindeki:
+
+"Merhaba, Ahmet"
+
+gibi ifadeleri kullanıcı adına bağımlı olmayan bir ifadeye dönüştür.
+
+Örneğin:
+
+"Merhaba"
+veya
+"Finansal durumun"
+
+kullanılabilir.
+
+Profil ekranında da Ahmet Yılmaz gibi gerçek isim gösterme.
+
+Email gösterilebilir.
+
+## 3. Gelir Ekle ekranı oluştur
+
+Mevcut design system ile yeni bir "Gelir Ekle" mobil ekranı oluştur.
+
+Alanlar:
+
+- Tutar
+- Açıklama (opsiyonel)
+- Tarih
+
+Buton:
+
+- Geliri Kaydet
+
+AI veya kategori alanı ekleme.
+
+## 4. Bütçeler ekranındaki AI özelliğini kaldır
+
+Budget ekranındaki:
+
+- AI Analizi
+- AI Önerisi
+- AI bütçe önerisi
+
+gibi özellikleri kaldır.
+
+Backend'de Budget için özel AI analizi veya bütçe tavsiyesi yoktur.
+
+Bütçe ekranı yalnızca deterministik bilgileri göstermeli:
+
+- kategori
+- limit
+- harcanan
+- kullanım yüzdesi
+- kalan / aşılan
+- Normal / Warning / Exceeded durumu
+
+## 5. Bütçe Ekle/Güncelle ekranını düzelt
+
+Yeni bütçe ekranında AI Önerisi bölümünü kaldır.
+
+Kategori seçenekleri backend whitelist'iyle birebir uyumlu olmalıdır:
+
+- Market
+- Ulaşım
+- Fatura
+- Eğlence
+- Sağlık
+- Eğitim
+- Kira
+- Diğer
+
+"Market & Gıda" gibi farklı kategori isimleri kullanma.
+
+Bütçe güncelleme görünümünde yalnızca Bütçe Limiti editable olmalıdır.
+
+Kategori, ay ve yıl read-only gösterilmelidir.
+
+## 6. Fatura listesi ekranını düzelt
+
+"Ödenmiş" ve "Bekleyen" filtrelerini kaldır.
+
+Backend'de Bill için payment status alanı bulunmuyor.
+
+Gerekirse yalnızca:
+
+- Tümü
+- Elektrik
+- Su
+- Doğalgaz
+
+filtreleri kullanılabilir.
+
+## 7. Fatura Ekle ekranını düzelt
+
+Fatura türleri yalnızca:
+
+- Elektrik
+- Su
+- Doğalgaz
+
+olmalıdır.
+
+"Diğer" seçeneğini kaldır.
+
+"AI Tahmini" veya herhangi bir AI fatura tahmini özelliğini tamamen kaldır.
+
+Alanlar sadece:
+
+- Fatura Türü
+- Tutar
+- Tüketim Miktarı (opsiyonel)
+- Fatura Tarihi
+
+olmalıdır.
+
+Birim otomatik türetilmelidir:
+
+Elektrik → kWh
+Su → m³
+Doğalgaz → m³
+
+## 8. Fatura Trend ekranını düzelt
+
+Sekmeler yalnızca:
+
+- Elektrik
+- Su
+- Doğalgaz
+
+olmalıdır.
+
+"İnternet" seçeneğini kaldır.
+
+AI Analizi bölümünü kaldır.
+
+Bu ekran yalnızca backend tarafından hesaplanan:
+
+- aylık toplam fatura tutarı
+- aylık tüketim
+
+trendlerini göstermelidir.
+
+Son 6 ay kullanılmalıdır.
+
+## 9. AI aylık analiz detayını backend ile uyumlu hale getir
+
+"Geçen yıla göre %20 arttı"
+
+gibi backend'de bulunmayan karşılaştırmaları kaldır.
+
+Backend yalnızca mevcut ay ile önceki ay arasındaki gider değişimini sağlar.
+
+AI yalnızca şu backend hesaplarını yorumlayabilir:
+
+- toplam gelir
+- toplam gider
+- bakiye
+- kategori harcamaları
+- bütçe kullanım durumu
+- önceki aya göre gider değişimi
+- en yüksek harcama kategorisi
+- en fazla artan kategori
+
+AI kendi başına yeni finansal karşılaştırma üretmemelidir.
+
+"Geçen yıl aynı dönem" kartı gibi backend'de olmayan veri bloklarını kaldır.
+
+"Bütçe Planını Güncelle" gibi AI'ın finansal aksiyon önerdiği CTA kullanma.
+
+AI aylık analiz ekranı sade bir insight görünümü olmalıdır.
+
+Örneğin:
+
+AI Aylık Analiz
+Ağustos 2026
+
+"Bu ay harcamaların en çok Market kategorisinde yoğunlaştı.
+Ulaşım bütçen limitine yaklaştı."
+
+Altında küçük açıklama:
+
+"Bu yorum mevcut finansal verilerine göre oluşturulmuştur."
+
+## 10. Profil ekranını MVP seviyesine indir
+
+Backend'de olmayan:
+
+- Pro Üye
+- Bildirimler
+- Uygulama Dili ayarı
+- Yardım ve Destek özelliği
+
+gibi alanları kaldır.
+
+MVP profil ekranında yalnızca:
+
+- Email
+- Çıkış Yap
+
+bulunması yeterlidir.
+
+İstersen sade uygulama bilgisi gösterilebilir, ancak yeni backend özelliği gerektirmemelidir.
+
+## 11. AI kategori önerisi ekranını koru
+
+Gider Ekle ekranındaki AI öneri yaklaşımı doğrudur.
+
+Şu davranış korunmalıdır:
+
+- kullanıcı açıklama girer
+- "AI ile Kategori Öner" butonuna basar
+- önerilen kategori gösterilir
+- kullanıcı "Öneriyi Kullan" veya "Başka Kategori Seç" kararı verir
+- AI otomatik kayıt oluşturmaz
+
+AI unavailable durumu da gösterilmelidir.
+
+## 12. Eksik durum ekranları
+
+Aynı design system içinde sade örnekler üret:
+
+- Dashboard veri yok
+- Liste boş
+- API hata durumu
+- Network hata durumu
+- Session expired
+- AI kategori öneremedi
+- AI aylık analiz oluşturulamadı
+- Loading
+
+Bu durumlarda teknik backend hata mesajları gösterme.
+
+## 13. Design system'i koru
+
+Mevcut tasarımın başarılı özelliklerini değiştirme:
+
+- lacivert primary renk
+- açık surface/background
+- sade kart yapıları
+- yeşil / amber / kırmızı durum renkleri
+- bottom navigation
+- tipografi hiyerarşisi
+- mobil spacing yaklaşımı
+
+Tüm revize ekranlar mevcut SmartBudget AI tasarımına aitmiş gibi görünmelidir.
+
+## Sonuç
+
+Revizyon sonunda özellikle şu ekranların backend sözleşmesiyle birebir uyumlu olduğundan emin ol:
+
+- Dashboard
+- Register
+- Gider Ekle
+- Gelir Ekle
+- İşlemler
+- Bütçeler
+- Bütçe Ekle/Güncelle
+- Faturalar
+- Fatura Ekle
+- Fatura Trendleri
+- AI Aylık Analiz
+- Profil
+
+Backend'de olmayan yeni özellik uydurma.

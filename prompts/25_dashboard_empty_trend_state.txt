@@ -1,0 +1,65 @@
+Önce PROJECT.md ve docs/DESIGN.md dosyalarını oku.
+
+Flutter Dashboard manuel testinde küçük bir UX problemi bulundu.
+
+Mevcut davranış:
+Son 6 aylık harcama trendinde kullanıcıya ait hiçbir gerçek veri olmadığında ekran:
+
+Mar 0,00
+Nis 0,00
+May 0,00
+...
+
+gibi altı adet sıfır değer gösteriyor.
+
+İstenen davranış:
+
+Eğer LastSixMonthsTrend içindeki tüm ayların harcama değeri 0 ise,
+trend satırlarını göstermeyip bunun yerine kullanıcı dostu bir empty-state göster:
+
+"Son 6 ay için veri yok."
+
+veya DESIGN.md diline uygun çok benzer kısa bir Türkçe mesaj.
+
+Önemli:
+
+- Backend contract değiştirme.
+- Dashboard endpointini değiştirme.
+- Finansal hesaplama ekleme.
+- Yeni package ekleme.
+- Chart yapısını değiştirme.
+- Sadece Flutter presentation katmanında bu empty-state kararını ver.
+
+Davranış:
+
+1. Altı ayın tamamı 0 ise:
+   - ay/sıfır satırlarını gösterme
+   - "Son 6 ay için veri yok." göster
+
+2. En az bir ayda gerçek harcama > 0 ise:
+   - mevcut 6 aylık trend görünümünü aynen koru
+   - diğer sıfır aylar 0,00 olarak görünebilir
+
+Bu kontrol yalnızca UI/presentation amacıyla kullanılmalı.
+Backend verisini değiştirme veya yeniden hesaplama yapma.
+
+İlgili widget/screen için regression test ekle:
+
+- tüm trend değerleri 0 -> empty state görünür
+- en az bir trend değeri > 0 -> mevcut trend görünür
+
+Sonunda:
+
+flutter analyze
+flutter test
+
+çalıştır.
+
+İş bitiminde raporla:
+1. değiştirilen dosyalar
+2. empty-state kontrolünün nerede yapıldığı
+3. eklenen testler
+4. flutter analyze sonucu
+5. flutter test sonucu
+
+Bu görev dışında refactor veya yeni feature yapma.

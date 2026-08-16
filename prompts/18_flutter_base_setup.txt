@@ -1,0 +1,647 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut backend klasör yapısını ve endpoint sözleşmelerini incele.
+
+Bu görevde yalnızca Flutter mobil uygulamasının temel yapısını kur.
+
+Bu aşamada tüm ekranları ve tüm işlevleri bir anda geliştirme.
+
+Amaç:
+SmartBudget AI mobil uygulamasının sağlam, sade ve mevcut backend ile uyumlu temelini oluşturmak.
+
+## Çok Önemli Source-of-Truth Önceliği
+
+Backend ve proje dokümanları özellikler açısından ana doğruluk kaynağıdır.
+
+Stitch tasarımları yalnızca görsel/UX referansıdır.
+
+Stitch HTML çıktısını birebir özellik kaynağı olarak kabul etme.
+
+Stitch tasarımında backend'de olmayan bir özellik görünüyorsa onu Flutter'a taşıma.
+
+Özellikle:
+
+- Fatura Trendleri ekranında AI gelecek fatura tahmini gösterme.
+- Profil ekranında isim gösterme.
+- Profil ekranında Pro/Premium üyelik gösterme.
+- Profil ekranında hesap ayarları gösterme.
+- Profil yalnızca authenticated kullanıcının email adresi ve Çıkış Yap aksiyonunu içermelidir.
+- Google/Apple login ekleme.
+- Bildirim özelliği ekleme.
+- Bill payment status ekleme.
+- Yeni backend özelliği uydurma.
+
+## Teknoloji
+
+Flutter + Dart kullan.
+
+Mümkün olduğunca güncel ve sade Flutter yaklaşımı kullan.
+
+Bu proje MVP olduğu için gereksiz architecture framework ekleme.
+
+Şunları ekleme:
+
+- BLoC
+- Redux
+- GetX
+- Riverpod
+- injectable
+- code generation ağırlıklı yapı
+- Clean Architecture katmanlarını gereksiz yere çoğaltma
+
+Basit ve anlaşılır yapı kullan.
+
+State management için Flutter'ın temel imkanları yeterliyse onları kullan.
+
+Gerekirse küçük ve sınırlı ChangeNotifier yaklaşımı kullanılabilir.
+
+## Klasör Yapısı
+
+mobile klasörü altında Flutter uygulaması oluştur.
+
+Önerilen sade yapı:
+
+mobile/
+  lib/
+    main.dart
+    app.dart
+
+    config/
+      api_config.dart
+      app_theme.dart
+
+    models/
+
+    services/
+      api_client.dart
+      auth_service.dart
+
+    storage/
+      secure_storage_service.dart
+
+    screens/
+      auth/
+        login_screen.dart
+        register_screen.dart
+
+      dashboard/
+        dashboard_screen.dart
+
+      transactions/
+        transactions_screen.dart
+
+      budgets/
+        budgets_screen.dart
+
+      bills/
+        bills_screen.dart
+
+      profile/
+        profile_screen.dart
+
+    widgets/
+      app_bottom_navigation.dart
+      primary_button.dart
+      app_text_field.dart
+      loading_view.dart
+      error_view.dart
+
+Yapıyı mevcut proje ihtiyacına göre küçük ölçüde değiştirebilirsin.
+
+Ancak gereksiz katman ekleme.
+
+## 1. Flutter Projesini Oluştur
+
+Eğer mobile altında Flutter projesi yoksa oluştur.
+
+Android ve iOS hedeflerini destekle.
+
+Web veya desktop bu MVP için gerekli değildir.
+
+Project/package isimlerini mevcut SmartBudget projesiyle tutarlı seç.
+
+## 2. Gerekli Paketler
+
+Yalnızca gerçekten gerekli minimum paketleri ekle.
+
+Beklenen temel ihtiyaçlar:
+
+- HTTP API iletişimi
+- JWT secure storage
+
+Tercih:
+
+- dio veya http paketlerinden yalnızca biri
+- flutter_secure_storage
+
+İkisini birden ekleme.
+
+Bu aşamada chart, animation veya ağır UI paketlerini henüz ekleme.
+
+Eklenen her paketi raporda açıkla.
+
+## 3. API Configuration
+
+Backend base URL tek bir merkezi config üzerinden yönetilmelidir.
+
+Örneğin:
+
+ApiConfig.baseUrl
+
+Hardcoded endpoint URL'lerini farklı screen dosyalarına dağıtma.
+
+Development için base URL configuration üzerinden değiştirilebilir olmalıdır.
+
+Android emulator için localhost problemini dikkate al.
+
+Ancak gerçek deployment URL'si uydurma.
+
+## 4. API Client
+
+Merkezi sade bir ApiClient oluştur.
+
+Sorumlulukları:
+
+- GET
+- POST
+- PUT
+- DELETE
+- JSON encode/decode
+- Authorization header ekleme
+- temel timeout
+- kontrollü API error handling
+
+JWT varsa:
+
+Authorization: Bearer <token>
+
+otomatik eklenmelidir.
+
+API client:
+
+- token'ı loglamamalı
+- password loglamamalı
+- raw backend stack trace göstermemeli
+
+Gereksiz generic networking framework oluşturma.
+
+## 5. Secure Storage
+
+JWT access token flutter_secure_storage ile saklanmalıdır.
+
+SharedPreferences içine JWT koyma.
+
+En az:
+
+- saveToken
+- readToken
+- deleteToken
+
+davranışlarını destekle.
+
+Gerekirse authenticated kullanıcının email adresini sade biçimde saklama/elde etme yaklaşımı oluştur.
+
+Ancak password saklama.
+
+## 6. Authentication Model ve Service
+
+Mevcut backend Auth endpointlerini inceleyerek Flutter model/service yapısını oluştur.
+
+Login ve Register request/response modelleri backend sözleşmesiyle birebir uyumlu olmalıdır.
+
+Endpoint path veya JSON field isimlerini tahmin etme.
+
+Mevcut backend controller/DTO'larını okuyarak belirle.
+
+AuthService en az:
+
+- register
+- login
+- logout
+- mevcut token var mı kontrolü
+
+davranışlarını sağlamalıdır.
+
+Başarılı login:
+
+- access token secure storage'a yazılmalı
+- kullanıcı authenticated state'e geçmeli
+
+Logout:
+
+- token silinmeli
+- auth state temizlenmeli
+
+## 7. App Startup / Auth State
+
+Uygulama açıldığında:
+
+- secure storage'daki token kontrol edilmeli
+
+Token varsa:
+
+- authenticated ana yapıya yönlendir
+
+Token yoksa:
+
+- Login ekranına yönlendir
+
+Bu aşamada refresh token mekanizması oluşturma.
+
+Backend MVP'de refresh token yoktur.
+
+JWT'nin gerçek geçerliliğinin backend tarafından 401 ile kontrol edileceğini unutma.
+
+## 8. 401 / Session Expired Davranışı
+
+API 401 döndürürse:
+
+- token temizlenebilmeli
+- kullanıcı Login ekranına yönlendirilebilmeli
+- teknik olmayan sade mesaj gösterilmeli
+
+Örnek semantik:
+
+"Oturumunuz sona erdi. Lütfen tekrar giriş yapın."
+
+Bu davranışı merkezi API/auth yaklaşımına uygun şekilde tasarla.
+
+Screen'lerin her birine ayrı ayrı kopyalama.
+
+## 9. Theme
+
+docs/DESIGN.md varsa onu ana görsel referans olarak kullan.
+
+Stitch design system'deki yaklaşımı koru:
+
+- lacivert/mavi primary
+- açık background
+- sade surface/card
+- yeşil success
+- amber warning
+- kırmızı error
+- tutarlı radius
+- tutarlı spacing
+- modern fintech görünümü
+
+AppTheme oluştur.
+
+En az:
+
+- ColorScheme
+- scaffold background
+- AppBar theme
+- input decoration
+- button theme
+- card theme
+- typography
+
+merkezi tanımlanmalıdır.
+
+Screen içine rastgele farklı renk hex değerleri dağıtma.
+
+## 10. Reusable UI Components
+
+Bu aşamada temel ortak bileşenleri oluştur.
+
+En az:
+
+### PrimaryButton
+
+- loading destekleyebilir
+- disabled state
+- design system ile uyumlu
+
+### AppTextField
+
+- label
+- hint
+- validation/error
+- password obscure desteği
+
+### LoadingView
+
+### ErrorView
+
+Gereksiz component library oluşturma.
+
+## 11. Login Screen
+
+Stitch tasarımına görsel olarak yakın Login ekranı oluştur.
+
+Alanlar:
+
+- E-posta
+- Şifre
+
+Buton:
+
+- Giriş Yap
+
+Alt aksiyon:
+
+- Hesabın yok mu? Kayıt Ol
+
+Kurallar:
+
+- email trim
+- boş alan kontrolü
+- password boş kontrolü
+- login sırasında loading
+- çift submit engelle
+- backend hata response'unu kullanıcı dostu mesajla göster
+
+Başarılı login sonrası authenticated ana yapıya geç.
+
+## 12. Register Screen
+
+Alanlar:
+
+- E-posta
+- Şifre
+- Şifre Tekrar
+
+Buton:
+
+- Hesap Oluştur
+
+Kurallar:
+
+- email validasyonu
+- password minimum 8 karakter
+- password confirmation eşleşmesi
+- loading
+- çift submit engelle
+
+Backend request'inde yalnızca backend DTO'nun beklediği alanları gönder.
+
+Şifre tekrar alanını backend'e gönderme eğer backend request DTO'sunda yoksa.
+
+Başarılı register sonrası mevcut backend davranışına uy.
+
+Backend register token döndürmüyorsa otomatik authenticated kabul etme.
+
+Bu durumda Login ekranına kontrollü biçimde yönlendir.
+
+## 13. Ana Mobil Shell
+
+Authentication sonrası bottom navigation shell oluştur.
+
+Sekmeler:
+
+1. Ana Sayfa
+2. İşlemler
+3. Bütçeler
+4. Faturalar
+5. Profil
+
+Mevcut Stitch görsel yaklaşımını kullan.
+
+Bu aşamada bu ekranların işlevlerini tamamen geliştirme.
+
+Her ekran için temel scaffold/header/placeholders oluştur.
+
+Ancak kaliteli ve design system ile uyumlu görünsün.
+
+"Coming soon" gibi üretim dışı İngilizce ifadeler kullanma.
+
+Placeholder gerekirse Türkçe ve sade kullan.
+
+## 14. Dashboard Placeholder
+
+DashboardScreen oluştur.
+
+Bu aşamada gerçek Dashboard API entegrasyonunu yapma.
+
+Ancak Stitch tasarımına uygun temel yerleşimi hazırla:
+
+- dönem başlığı
+- finansal summary card bölgesi
+- kategori harcamaları bölgesi
+- bütçe durumu bölgesi
+- trend bölgesi
+- AI aylık yorum bölgesi
+
+Fake finansal rakamları production UI'da hardcode etme.
+
+Loading/empty placeholder kullanılabilir.
+
+Bir sonraki geliştirme aşamasında gerçek Dashboard endpointi bağlanacak.
+
+## 15. Transactions Placeholder
+
+TransactionsScreen oluştur.
+
+Temel:
+
+- ekran başlığı
+- Tümü / Giderler / Gelirler filter görünümü için UI yeri
+- add action alanı
+
+Gerçek Expense/Income API entegrasyonunu bu aşamada yapma.
+
+## 16. Budgets Placeholder
+
+BudgetsScreen oluştur.
+
+Gerçek API entegrasyonu yapma.
+
+Tasarım için:
+
+- ay/yıl alanı
+- bütçe kartlarının geleceği liste alanı
+- Yeni Bütçe Ekle aksiyonu
+
+hazırlanabilir.
+
+AI Budget özelliği ekleme.
+
+## 17. Bills Placeholder
+
+BillsScreen oluştur.
+
+Temel filtreler:
+
+- Tümü
+- Elektrik
+- Su
+- Doğalgaz
+
+olabilir.
+
+Gerçek Bill API entegrasyonunu bu aşamada yapma.
+
+Payment status ekleme.
+
+AI future bill prediction ekleme.
+
+## 18. Profile Screen
+
+Profil ekranı MVP backend ile birebir uyumlu tutulmalıdır.
+
+Yalnızca:
+
+- authenticated kullanıcının email adresi
+- Çıkış Yap
+
+göster.
+
+Şunları ekleme:
+
+- isim
+- soyisim
+- Pro/Premium
+- üyelik
+- bildirim
+- dil
+- hesap ayarları
+- şifre değiştir
+- profil fotoğrafı upload
+- yardım/support backend özelliği
+
+Logout token'ı güvenli storage'dan silmeli ve Login ekranına dönmelidir.
+
+## 19. Navigation
+
+Navigation sade tutulmalıdır.
+
+Gereksiz üçüncü parti navigation framework ekleme.
+
+Flutter'ın mevcut Navigator yaklaşımını kullanabilirsin.
+
+Login/Register ve authenticated shell geçişlerinin back-stack davranışını doğru yap.
+
+Logout sonrası kullanıcı back ile authenticated ekrana dönememelidir.
+
+## 20. Error Handling
+
+Backend Problem Details veya mevcut hata response formatını incele.
+
+Flutter API client hataları kullanıcı dostu hale getirsin.
+
+En az ayırt edilebilecek durumlar:
+
+- network error
+- timeout
+- 400 validation
+- 401 unauthorized
+- 404
+- 409 conflict
+- 500 / unknown
+
+UI'da:
+
+- stack trace
+- exception class
+- raw HTML
+- raw provider/API response
+
+gösterme.
+
+## 21. Güvenlik
+
+- JWT secure storage dışında saklanmamalı.
+- Password hiçbir local storage'a yazılmamalı.
+- API key Flutter'a eklenmemeli.
+- OpenAI API key Flutter'a kesinlikle eklenmemeli.
+- Flutter doğrudan OpenAI'a bağlanmamalı.
+- AI çağrıları yalnızca mevcut ASP.NET Core backend üzerinden yapılacaktır.
+- Token console/log çıktısına yazılmamalı.
+- UserId client tarafından ownership amacıyla gönderilmemeli.
+
+## 22. Testler
+
+Temel Flutter testleri ekle.
+
+En az:
+
+- Login validation
+- Register password minimum 8
+- Password confirmation mismatch
+- Auth token storage
+- Logout token delete
+- Auth state token yokken login
+- Auth state token varken authenticated shell
+- API client Authorization header ekleme
+- 401 durumunda session handling
+- PrimaryButton loading/disabled davranışı
+
+Gerçek backend'e bağımlı kırılgan unit/widget testleri oluşturma.
+
+Mock/fake yaklaşımı kullan.
+
+## 23. Static Analysis / Format / Test
+
+İş bitiminde çalıştır:
+
+flutter pub get
+dart format .
+flutter analyze
+flutter test
+
+Mümkünse Android debug build de çalıştır:
+
+flutter build apk --debug
+
+Eğer ortam nedeniyle Android build yapılamıyorsa bunu açıkça raporla.
+
+Analyze warning/error varsa mümkün olduğunca düzelt.
+
+## Çok Önemli — Bu Aşamada Yapma
+
+Bu aşamada:
+
+- gerçek Dashboard API entegrasyonu yapma
+- Expense CRUD geliştirme
+- Income CRUD geliştirme
+- Budget API entegrasyonu yapma
+- Bill API entegrasyonu yapma
+- chart library ekleme
+- AI kategorileme UI/API entegrasyonu yapma
+- AI aylık analiz API entegrasyonu yapma
+- push notification ekleme
+- biometric auth ekleme
+- refresh token ekleme
+- dark mode zorunlu hale getirme
+- premium/subscription ekleme
+- Google/Apple login ekleme
+- backend değiştirme
+- yeni backend endpoint oluşturma
+
+Ama authentication için gerekli backend endpointlerini kullan.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan Flutter proje yapısı
+2. Eklenen paketler ve nedenleri
+3. API base URL/configuration yaklaşımı
+4. ApiClient yapısı
+5. Secure storage yaklaşımı
+6. Login akışı
+7. Register akışı
+8. Auth startup/session yaklaşımı
+9. 401 handling yaklaşımı
+10. Theme/design system implementasyonu
+11. Oluşturulan reusable widgetlar
+12. Bottom navigation yapısı
+13. Dashboard placeholder yapısı
+14. Transactions placeholder yapısı
+15. Budgets placeholder yapısı
+16. Bills placeholder yapısı
+17. Profile/logout davranışı
+18. Güvenlik kontrolleri
+19. Oluşturulan testler
+20. flutter analyze sonucu
+21. flutter test sonucu
+22. Android debug build sonucu
+23. Bilerek geliştirilmemiş özellikler
+24. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

@@ -1,0 +1,293 @@
+Önce PROJECT.md ve docs/DESIGN.md dosyalarını oku.
+
+Ardından mevcut Flutter interactive tutorial / coach-mark implementasyonunu incele.
+
+Manuel emulator testinde gerçek bir UX problemi bulundu.
+
+## Problem
+
+Tutorial Step 2:
+
+"Gelir ve Giderlerinizi Ekleyin"
+
+ve Step 3:
+
+"AI ile Kategori Önerisi"
+
+şu anda aynı gerçek UI öğesini:
+
+"İşlem Ekle"
+
+butonunu highlight ediyor.
+
+Bu nedenle Step 3 kullanıcıya AI kategori özelliğinin nerede bulunduğunu göstermiyor ve Step 2'nin tekrarı gibi görünüyor.
+
+Bu görev yalnızca bu tutorial adımını daha anlamlı hale getirmek içindir.
+
+Backend değiştirme.
+Yeni package ekleme.
+Büyük refactor yapma.
+
+---
+
+# İstenen Akış
+
+## Step 2 — İşlemler
+
+Mevcut davranış korunabilir.
+
+Gerçek İşlemler ekranı gösterilsin.
+
+Highlight:
+
+"İşlem Ekle"
+
+butonu.
+
+Tutorial:
+
+Başlık:
+"Gelir ve Giderlerinizi Ekleyin"
+
+Metin:
+"Gelir ve gider kayıtlarınızı buradan ekleyebilirsiniz."
+
+Bu step kullanıcının yeni işlem oluşturma giriş noktasını öğretir.
+
+---
+
+# Step 3 — AI Kategori Önerisi
+
+Step 3 artık aynı "İşlem Ekle" butonunu highlight ETMEMELİDİR.
+
+Step 3'e geçildiğinde mümkünse mevcut gerçek gider ekleme arayüzü tutorial amacıyla açılmalıdır.
+
+Ama form:
+
+- otomatik submit edilmemeli
+- backend write yapmamalı
+- AI endpoint çağırmamalı
+- fake AI sonucu göstermemeli
+- otomatik değer doldurmamalı
+
+Amaç yalnızca gerçek AI kategori kontrolünün nerede olduğunu göstermek.
+
+---
+
+# Tercih Edilen Davranış
+
+Step 2'de kullanıcı "İleri" dediğinde:
+
+1. Transactions ekranında kal.
+2. Mevcut gerçek "Gider Ekle" / Add Expense formunu aç.
+3. Form render olduktan sonra AI kategori önerisi için kullanılan gerçek UI kontrolünü highlight et.
+
+Bu kontrol mevcut uygulamada örneğin:
+
+- "AI ile Öner"
+- "Kategori Öner"
+- AI icon/button
+- gider açıklamasından sonra kullanılan suggestion alanı
+
+hangisiyse gerçek implementasyondan tespit et.
+
+Buton/metin adını tahmin etme.
+Mevcut koddan gerçek UI öğesini bul.
+
+Target widget'a gerekiyorsa GlobalKey ekle.
+
+Step 3 highlight yalnızca AI kategori önerisi kontrolünü göstermelidir.
+
+Tutorial card:
+
+Başlık:
+"AI ile Kategori Önerisi"
+
+Metin:
+"Gider açıklamanıza göre AI'dan kategori önerisi alabilirsiniz. Öneriyi kabul etmek veya değiştirmek sizin kontrolünüzdedir."
+
+---
+
+# Eğer Form Açılması Teknik Olarak Uygunsa
+
+Form tutorial sırasında açılabilir.
+
+Ancak interaction safety korunmalı:
+
+- kullanıcı form alanlarına yanlışlıkla veri girememeli veya submit edememeli
+- AI butonuna basamamalı
+- tutorial overlay input'u engelleyebilir
+
+Gerçek form sadece görsel eğitim amacıyla görünmelidir.
+
+Tutorial navigation:
+
+- Geri
+- İleri
+- Atla
+
+aktif kalmalıdır.
+
+---
+
+# Step 3'ten Step 4'e Geçiş
+
+Step 3'te "İleri" denildiğinde:
+
+- tutorial amacıyla açılmış Add Expense formu güvenli şekilde kapanmalı
+- Bütçeler sekmesine geçilmeli
+- mevcut Step 4 walkthrough devam etmeli
+
+---
+
+# Step 3'ten Geri
+
+Step 3'te "Geri" denildiğinde:
+
+- tutorial için açılan gider formu kapanmalı
+- İşlemler ana ekranına dönülmeli
+- Step 2 tekrar gösterilmeli
+- "İşlem Ekle" butonu tekrar highlight edilmeli
+
+---
+
+# Atla / Tutorial Kapatma
+
+Step 3 sırasında:
+
+- Atla
+- tutorial tamamlanması
+- tutorial dışarıdan kapatılması
+
+gibi durumlarda tutorial için açılmış form açık bırakılmamalıdır.
+
+Normal Transactions ekran state'ine geri dön.
+
+---
+
+# Normal Uygulama Davranışını Bozma
+
+Tutorial dışında kullanıcı normal şekilde "İşlem Ekle" dediğinde mevcut form davranışı aynen çalışmalıdır.
+
+Tutorial için özel olarak:
+
+- backend çağrısını kapatmak adına production form mantığını bozma
+- gerçek formun normal submit davranışını değiştirme
+
+Tutorial overlay interaction'ı engelleyerek güvenliği sağla.
+
+---
+
+# Eğer AI Kontrolü Formda Koşullu Görünüyorsa
+
+Örneğin AI öneri butonu yalnız açıklama yazıldığında görünüyorsa:
+
+Gerçek backend çağrısı yapmadan ve kullanıcı adına sahte finansal veri üretmeden mümkün olan en sade görsel çözümü kullan.
+
+Tercihler sırasıyla:
+
+1. UI kontrolü formda zaten sürekli görünüyorsa direkt highlight et.
+2. UI kontrolü sadece form mode/state ile görünüyorsa mevcut local UI state üzerinden güvenli şekilde görünür hale getir.
+3. Bunun için production form business logic'ini bozmak gerekiyorsa büyük değişiklik yapma.
+
+Fake AI sonucu üretme.
+
+Backend'e istek gönderme.
+
+Database write yapma.
+
+---
+
+# Coach-Mark Kart Konumu
+
+Step 3'te tutorial card AI target'ını kapatmamalıdır.
+
+Target alt taraftaysa card üstte,
+target üst taraftaysa card altta olabilir.
+
+Mevcut responsive target-position logic'i kullan.
+
+Hard-coded screen coordinate ekleme.
+
+---
+
+# Testler
+
+Mevcut walkthrough testlerini güncelle.
+
+En az:
+
+1. Step 2:
+   - Transactions screen
+   - İşlem Ekle target highlight
+
+2. Step 2 -> İleri:
+   - Step 3 açılır
+   - Step 3 artık Step 2 target'ını kullanmaz
+
+3. Step 3:
+   - gerçek Add Expense UI görünür
+   - AI category suggestion target bulunur/highlight edilir
+
+4. Step 3 sırasında:
+   - AI endpoint çağrısı yapılmaz
+   - Expense POST yapılmaz
+
+5. Step 3 -> Geri:
+   - form kapanır
+   - Step 2 görünür
+   - İşlem Ekle tekrar target olur
+
+6. Step 3 -> İleri:
+   - form kapanır
+   - Budget tab açılır
+   - Step 4 devam eder
+
+7. Step 3 -> Atla:
+   - form açık kalmaz
+
+8. Normal tutorial dışı Expense form davranışı bozulmaz.
+
+---
+
+# Yapma
+
+- Step 2 ve Step 3'te aynı target'ı bırakma
+- backend değiştirme
+- API değiştirme
+- database değiştirme
+- AI request çalıştırma
+- Expense oluşturma
+- fake AI response
+- üçüncü parti package
+- hard-coded coordinate
+- büyük refactor
+
+---
+
+# Son Doğrulama
+
+Çalıştır:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+---
+
+# İş Bitiminde Raporla
+
+1. Step 2 target'ı
+2. Step 3 için kullanılan gerçek AI target'ı
+3. Add Expense formunun tutorial sırasında nasıl açıldığı
+4. Formun tutorial çıkışlarında nasıl kapatıldığı
+5. Backend write / AI request yapılmadığının doğrulanması
+6. Değiştirilen dosyalar
+7. Eklenen/değiştirilen testler
+8. flutter analyze sonucu
+9. flutter test sonucu
+10. APK build sonucu
+11. Manuel emulator kontrol noktaları
+
+Bu görev dışında yeni feature veya refactor yapma.

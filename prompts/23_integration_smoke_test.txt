@@ -1,0 +1,648 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut backend ve Flutter mobile uygulamasını incele.
+
+Bu görevde yeni özellik geliştirme.
+
+Amaç:
+SmartBudget AI'nin mevcut backend + PostgreSQL + Flutter entegrasyonunu gerçek çalışma akışları üzerinden smoke/integration seviyesinde doğrulamak ve yalnızca gerçek hata varsa minimum düzeltme yapmak.
+
+Codex kullanım kotası sınırlı olduğu için:
+- gereksiz refactor yapma
+- yeni abstraction oluşturma
+- mevcut çalışan kodu yeniden yazma
+- yeni özellik ekleme
+- kapsamı büyütme
+
+Öncelik yalnızca gerçek entegrasyon hatalarını bulmak ve doğrulamaktır.
+
+## 1. Başlangıç Kontrolü
+
+Önce mevcut durumun bozulmadığını doğrula.
+
+Backend:
+
+- build
+- tüm backend testleri
+
+Flutter:
+
+- flutter analyze
+- flutter test
+
+çalıştır.
+
+Mevcut testlerin tamamı geçmelidir.
+
+Testlerden biri başarısızsa önce mevcut regressioni tespit et.
+
+---
+
+## 2. PostgreSQL Bağlantısı
+
+Gerçek PostgreSQL development database bağlantısını doğrula.
+
+Secret/config değerlerini raporda gösterme.
+
+Şunları kontrol et:
+
+- database erişilebilir mi
+- migration uygulanmış mı
+- Categories seed verileri mevcut mu
+- API mevcut schema ile çalışabiliyor mu
+
+Database password veya connection string'i loglama.
+
+Yeni migration oluşturma, gerçekten schema problemi yoksa migration değiştirme.
+
+---
+
+## 3. Backend'i Çalıştır
+
+Mevcut development configuration ile ASP.NET Core API'yi çalıştır.
+
+Gerçek listening URL/port değerini tespit et.
+
+Flutter ApiConfig development URL'sinin gerçek backend URL'siyle uyumlu olup olmadığını kontrol et.
+
+Android emulator için:
+
+localhost yerine 10.0.2.2
+
+gerektiğini dikkate al.
+
+Base URL uyuşmuyorsa bunu raporla.
+
+Yalnızca gerçek config hatası varsa minimum düzeltme yap.
+
+---
+
+# HAPPY PATH TESTİ
+
+Aşağıdaki akışı mümkün olduğunca gerçek backend + database üzerinde doğrula.
+
+## 4. Register
+
+Yeni bir test kullanıcısı oluştur.
+
+Test email'i disposable/development amaçlı olabilir.
+
+Gerçek kullanıcı kişisel bilgisi kullanma.
+
+Kontrol:
+
+- POST /api/auth/register
+- 201 dönüyor mu
+- password plaintext database'e yazılmıyor mu
+- kullanıcı oluşuyor mu
+
+Register sonrası backend token döndürmüyorsa bunu mevcut sözleşme olarak koru.
+
+---
+
+## 5. Login
+
+Oluşturulan kullanıcıyla login yap.
+
+Kontrol:
+
+- POST /api/auth/login
+- token dönüyor mu
+- token protected endpointlerde çalışıyor mu
+
+Token değerini rapora yazma.
+
+---
+
+## 6. Categories
+
+Authenticated:
+
+GET /api/categories
+
+çağır.
+
+Kontrol:
+
+8 kategori dönüyor mu:
+
+- Market
+- Ulaşım
+- Fatura
+- Eğlence
+- Sağlık
+- Eğitim
+- Kira
+- Diğer
+
+Category Guid değerlerini raporda tam olarak yazmak zorunda değilsin.
+
+---
+
+## 7. Income Happy Path
+
+Bir gelir oluştur.
+
+Örneğin test amaçlı:
+
+- pozitif amount
+- description
+- mevcut dönem tarihi
+
+Kontrol:
+
+- POST /api/incomes başarılı
+- GET /api/incomes kaydı gösteriyor
+- UserId request'ten gönderilmiyor
+- authenticated kullanıcıya ait
+
+---
+
+## 8. Expense Happy Path
+
+Manuel kategori seçerek bir gider oluştur.
+
+Kontrol:
+
+- POST /api/expenses başarılı
+- GET /api/expenses kaydı gösteriyor
+- doğru kategori
+- IsAiCategorized false
+- UserId request'te yok
+
+---
+
+## 9. AI Expense Categorization Smoke Test
+
+Gerçek AI configuration mevcut ve API key ayarlıysa:
+
+POST /api/ai/categorize-expense
+
+ile basit bir açıklama test et.
+
+Örneğin:
+
+"Market alışverişi"
+
+Kontrol:
+
+- endpoint erişilebilir mi
+- Success true ise whitelist kategori dönüyor mu
+- CategoryId backend tarafından eşlenmiş mi
+- Expense otomatik oluşturulmuyor mu
+
+Eğer gerçek AI API key/configuration mevcut değilse:
+
+- bunu hata olarak değerlendirme
+- açıkça "AI real-provider smoke test yapılamadı" diye raporla
+- fake testlerin geçtiğini belirt
+
+API key'i asla çıktıda gösterme.
+
+---
+
+## 10. AI Öneri + Expense
+
+AI gerçek provider ile başarılı çalışıyorsa:
+
+- AI önerisini al
+- ardından ayrı POST /api/expenses isteğiyle gider oluştur
+
+Kontrol:
+
+- iki ayrı işlem
+- AI endpointi kendi başına Expense oluşturmuyor
+- accepted AI category ile oluşturulan Expense için IsAiCategorized true kullanılabiliyor
+
+AI provider yoksa bu adımı atla ve sebebi raporla.
+
+---
+
+## 11. Budget Happy Path
+
+Mevcut ay ve bir kategori için Budget oluştur.
+
+Kontrol:
+
+POST /api/budgets
+
+sonrası:
+
+- LimitAmount doğru
+- SpentAmount backend tarafından hesaplanmış
+- UsagePercent backend tarafından hesaplanmış
+- AlertStatus backend tarafından hesaplanmış
+
+Flutter/mobile hesap yapma.
+
+Aynı kategori/ay/yıl için tekrar Budget oluşturmaya çalış.
+
+Beklenen:
+
+409 Conflict
+
+---
+
+## 12. Budget Update
+
+Oluşturulan Budget limitini güncelle.
+
+PUT /api/budgets/{id}
+
+Request yalnızca:
+
+limitAmount
+
+içermelidir.
+
+Kontrol:
+
+- update başarılı
+- Category değişmiyor
+- Month değişmiyor
+- Year değişmiyor
+- yeni SpentAmount/UsagePercent/AlertStatus backend response'tan geliyor
+
+---
+
+## 13. Bill Happy Path
+
+Bir Electricity Bill oluştur.
+
+Alanlar:
+
+- amount > 0
+- optional consumption > 0
+- mevcut dönem BillingDate
+
+Kontrol:
+
+- POST /api/bills başarılı
+- listede görünüyor
+- ConsumptionUnit kWh
+- UserId request'te yok
+
+Ardından Water veya NaturalGas kaydı da oluşturabilirsen trend ayrımını doğrula.
+
+---
+
+## 14. Bill Trend
+
+GET /api/bills/trends
+
+çağır.
+
+Kontrol:
+
+- response parse edilebilir
+- 6 ay × 3 tür = 18 nokta yaklaşımı korunuyor mu
+- Electricity/Water/NaturalGas ayrı
+- TotalAmount backend'den geliyor
+- TotalConsumption nullable çalışıyor
+- null değer sahte 0 yapılmıyor
+
+---
+
+## 15. Dashboard Happy Path
+
+GET /api/dashboard/monthly
+
+çağır.
+
+Kontrol:
+
+- mevcut raporlama ayı backend tarafından belirleniyor
+- TotalIncome
+- TotalExpense
+- Balance
+- CategoryExpenses
+- BudgetUsages
+- PreviousMonthExpenseChangePercent
+- HighestSpendingCategory
+- HighestIncreaseCategory
+- LastSixMonthsTrend
+
+response'u parse edilebilir ve oluşturulan test verileriyle tutarlı mı.
+
+Flutter tarafında yeniden hesap yapma.
+
+---
+
+## 16. AI Monthly Summary Smoke Test
+
+Gerçek AI provider configuration mevcutsa:
+
+POST /api/ai/monthly-summary
+
+çağır.
+
+Kontrol:
+
+- Success true response üretilebiliyor mu
+- Dashboard bilgileri değişmeden kalıyor mu
+- database write oluşmuyor mu
+- Analysis structured ve güvenli response olarak geliyor mu
+
+AI provider configuration yoksa bu adımı atla ve bunu net raporla.
+
+---
+
+# ERROR / SECURITY SENARYOLARI
+
+## 17. Unauthorized
+
+Token olmadan protected endpoint çağır.
+
+Örneğin:
+
+GET /api/expenses
+
+Beklenen:
+
+401
+
+Raw stack trace veya hassas detay olmamalıdır.
+
+---
+
+## 18. Invalid Login
+
+Yanlış password ile login dene.
+
+Beklenen:
+
+401
+
+Email var/yok ayrımını sızdıran farklı hassas hata davranışı olmamalıdır.
+
+---
+
+## 19. Validation
+
+En az birkaç gerçek validation senaryosu doğrula:
+
+- Expense Amount = 0 → 400
+- Income Amount < 0 → 400
+- Bill ConsumptionValue = 0 verilmişse → 400
+- Budget Month = 13 → 400
+
+Her olası validasyonu tek tek tekrar etme.
+
+Smoke test için temsilî birkaç örnek yeterlidir.
+
+---
+
+## 20. Ownership / IDOR
+
+Mümkünse ikinci development test user oluştur.
+
+User A adına bir kayıt oluştur.
+
+User B tokenıyla User A kaydını:
+
+- DELETE Expense
+veya
+- DELETE Budget/Bill
+
+gibi bir ownership endpointi üzerinden erişmeye çalış.
+
+Beklenen:
+
+404
+
+403 veya veri detayının açığa çıkması yerine mevcut güvenli 404 davranışı korunmalıdır.
+
+User B User A listesini görememelidir.
+
+Bu testte development verisi kullan.
+
+---
+
+## 21. Duplicate Budget
+
+Aynı:
+
+UserId + CategoryId + Month + Year
+
+kombinasyonunu tekrar oluştur.
+
+Beklenen:
+
+409
+
+Raw PostgreSQL 23505 detayı client response'a sızmamalıdır.
+
+---
+
+## 22. Delete Akışları
+
+Development sırasında oluşturulan örnek kayıtlardan uygun olanları sil.
+
+Kontrol:
+
+- 204
+- listeden kayboluyor
+- Bill silinirse trend endpointi yeni sonucu üretebiliyor
+- ownership korunuyor
+
+---
+
+# FLUTTER ↔ BACKEND SMOKE
+
+## 23. Flutter Base URL
+
+Flutter development base URL'nin çalışan backend'e ulaşabildiğini kontrol et.
+
+Android emulator kullanılıyorsa:
+
+10.0.2.2
+
+gerektiğini doğrula.
+
+Gerçek cihaz kullanılıyorsa localhost/10.0.2.2 çalışmayacağını ve LAN IP gerektiğini sadece raporla.
+
+---
+
+## 24. Flutter Login
+
+Mümkünse Android emulator/debug app üzerinden gerçek backend login akışını doğrula.
+
+Eğer ortam interaktif emulator kullanımına izin vermiyorsa:
+
+- service/API seviyesindeki entegrasyonu doğrula
+- manuel cihaz testi gereken kısmı raporla
+
+Codex ortamında emulator açmak için aşırı zaman harcama.
+
+---
+
+## 25. Flutter JSON Parse
+
+Gerçek backend response örneklerini Flutter modellerinin parse edebildiğini mümkün olduğunca doğrula.
+
+Özellikle:
+
+- Login response
+- Dashboard
+- Expense
+- Income
+- Budget
+- Bill
+- Bill Trend
+- AI categorize response
+- AI monthly response
+
+alanlarında casing/nullability/enum problemi var mı kontrol et.
+
+Burada gerçek bir uyumsuzluk tespit edilirse minimum düzeltme yap.
+
+Backend sözleşmesini sebepsiz değiştirme.
+
+---
+
+## 26. Date / Decimal Kontrolü
+
+Gerçek backend ile özellikle şunları doğrula:
+
+- DateOnly JSON parse
+- BillingDate
+- decimal Amount
+- UsagePercent
+- nullable ConsumptionValue
+- nullable TotalConsumption
+- Türkçe gösterim yalnızca Flutter presentation seviyesinde kalıyor
+
+Decimal değerleri string sanma veya locale nedeniyle API payloadını bozma.
+
+---
+
+# DÜZELTME KURALI
+
+## 27. Yalnızca gerçek hata varsa düzelt
+
+Smoke test sırasında gerçek bir hata bulursan:
+
+1. Hatayı önce açıkça tanımla.
+2. Root cause belirle.
+3. Minimum değişiklikle düzelt.
+4. İlgili regression test ekle/güncelle.
+5. Tüm backend ve Flutter testlerini tekrar çalıştır.
+
+Şunları yapma:
+
+- "iyileştirme olsun" diye refactor
+- dosya taşıma
+- mimari yeniden tasarım
+- package değiştirme
+- yeni özellik
+- endpoint yeniden adlandırma
+
+---
+
+# TEST VERİSİ / TEMİZLİK
+
+## 28. Development test verileri
+
+Smoke test için oluşturulan kullanıcı/veriler açık development amaçlı olmalıdır.
+
+Production verisi kullanma.
+
+Mümkünse test sonunda oluşturulan geçici finansal kayıtları temizle.
+
+Kullanıcı kayıtlarını silmek için mevcut endpoint yoksa database'i doğrudan keyfi değiştirme.
+
+Test kullanıcılarının development database'de kalacağını raporlayabilirsin.
+
+---
+
+# SON DOĞRULAMA
+
+## 29. Backend
+
+Çalıştır:
+
+dotnet build
+dotnet test
+
+Sonucu raporla.
+
+---
+
+## 30. Flutter
+
+Çalıştır:
+
+flutter pub get
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+Sonucu raporla.
+
+---
+
+## Çok Önemli — Yapma
+
+Bu görevde:
+
+- yeni feature geliştirme
+- yeni endpoint ekleme
+- backend architecture refactor
+- Flutter architecture refactor
+- yeni state management paketi
+- yeni chart paketi
+- notification
+- premium
+- subscription
+- biometric auth
+- refresh token
+- sosyal login
+- Bill prediction
+- yeni AI özelliği
+- yeni CRUD özelliği
+- production deployment
+
+yapma.
+
+Sadece mevcut MVP'nin entegrasyonunu doğrula ve gerçek bug varsa minimum düzeltme yap.
+
+## İş Bitiminde Raporla
+
+1. Test edilen environment
+2. Backend URL/port (secret olmadan)
+3. PostgreSQL/migration durumu
+4. Backend başlangıç build/test sonucu
+5. Register sonucu
+6. Login sonucu
+7. Category sonucu
+8. Income happy path sonucu
+9. Expense happy path sonucu
+10. AI Expense Categorization gerçek-provider sonucu veya neden test edilemediği
+11. Budget create/duplicate/update sonucu
+12. Bill create sonucu
+13. Bill trend sonucu
+14. Dashboard sonucu
+15. AI Monthly Summary gerçek-provider sonucu veya neden test edilemediği
+16. 401 sonucu
+17. Validation test sonuçları
+18. Ownership/IDOR sonucu
+19. Flutter base URL uyumu
+20. Flutter ↔ backend model/JSON uyumu
+21. DateOnly/decimal/nullability sonucu
+22. Tespit edilen gerçek buglar
+23. Yapılan minimum düzeltmeler
+24. Eklenen regression testler
+25. Final backend test sonucu
+26. Final Flutter test sonucu
+27. flutter analyze sonucu
+28. Android debug build sonucu
+29. Manuel olarak hâlâ test edilmesi gereken noktalar
+30. Genel smoke test sonucu: PASS / PARTIAL PASS / FAIL
+
+Bu görev dışında yeni özellik geliştirme.

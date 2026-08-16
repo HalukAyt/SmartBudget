@@ -1,0 +1,218 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Bu dosyalar projenin source of truth dokümanlarıdır.
+
+SmartBudget AI projesinin backend temel yapısını oluştur.
+
+Kullanılacak teknolojiler:
+
+- ASP.NET Core Web API
+- C#
+- Entity Framework Core
+- PostgreSQL
+
+Bu aşamada yalnızca backend temel kurulumu, veri modeli ve veritabanı altyapısı oluşturulacaktır.
+
+Henüz authentication endpointlerini, Expense/Income/Budget/Bill CRUD işlemlerini, Dashboard veya AI entegrasyonunu geliştirme.
+
+## Yapılacaklar
+
+1. `backend/SmartBudget.Api` altında ASP.NET Core Web API projesini oluştur.
+
+2. Teknik mimari dokümanına uygun temel klasör yapısını oluştur:
+
+- Controllers
+- Services
+- Services/AI
+- Data
+- Data/Configurations
+- Entities
+- DTOs
+- Enums
+- Authentication
+- Middleware
+- Common
+
+3. Entity Framework Core ve PostgreSQL bağlantısı için gerekli altyapıyı hazırla.
+
+4. Aşağıdaki entity'leri oluştur:
+
+- User
+- Category
+- Expense
+- Income
+- Budget
+- Bill
+
+5. Tüm entity primary key alanları `Guid` olmalıdır.
+
+6. İlişkiler:
+
+User 1-N Expense
+User 1-N Income
+User 1-N Budget
+User 1-N Bill
+
+Category 1-N Expense
+Category 1-N Budget
+
+7. Finansal alanlar PostgreSQL tarafında `numeric(18,2)` olacak:
+
+- Expense.Amount
+- Income.Amount
+- Budget.LimitAmount
+- Bill.Amount
+
+8. Entity alanları:
+
+### User
+
+- Id: Guid
+- Email
+- PasswordHash
+- CreatedAt
+
+Email unique olmalıdır.
+
+### Category
+
+- Id: Guid
+- Name
+
+### Expense
+
+- Id: Guid
+- UserId: Guid
+- Amount
+- Description
+- CategoryId: Guid
+- Date
+- CreatedAt
+- IsAiCategorized
+
+### Income
+
+- Id: Guid
+- UserId: Guid
+- Amount
+- Description nullable
+- Date
+- CreatedAt
+
+### Budget
+
+- Id: Guid
+- UserId: Guid
+- CategoryId: Guid
+- LimitAmount
+- Month
+- Year
+- CreatedAt
+
+Aşağıdaki birleşim database seviyesinde unique olmalıdır:
+
+UserId + CategoryId + Month + Year
+
+### Bill
+
+- Id: Guid
+- UserId: Guid
+- BillType
+- Amount
+- ConsumptionValue nullable
+- BillingDate
+- CreatedAt
+
+9. `BillType` için yalnızca:
+
+- Electricity
+- Water
+- NaturalGas
+
+değerlerini destekleyen uygun enum yapısını oluştur.
+
+10. `Date` ve `BillingDate` tarih-only mantığıyla ele alınmalıdır.
+
+11. `CreatedAt` UTC olarak tutulmalıdır.
+
+12. PostgreSQL için `AppDbContext` oluştur.
+
+13. Entity ilişkilerini ve constraint'leri mümkün olduğunca `Data/Configurations` altında Fluent API ile tanımla.
+
+14. Sabit kategorileri database seed ile oluştur:
+
+- Market
+- Ulaşım
+- Fatura
+- Eğlence
+- Sağlık
+- Eğitim
+- Kira
+- Diğer
+
+Kategori seed kayıtlarının Guid değerleri deterministik ve sabit olmalıdır. Her migration veya uygulama başlangıcında yeni Guid üretilmemelidir.
+
+15. `ConsumptionValue` nullable olmalıdır.
+
+Bu aşamada ConsumptionValue için uygulama business validation geliştirme. Bu kontrol daha sonra Bill service içerisinde yapılacaktır.
+
+16. PostgreSQL connection string configuration üzerinden okunmalıdır.
+
+Connection string'i veya herhangi bir password/secret değerini source code içine hard-code etme.
+
+17. Development configuration için güvenli placeholder/configuration yaklaşımı kullan.
+
+Gerçek database password veya secret repository'ye ekleme.
+
+18. Program.cs içinde DbContext dependency injection kaydını yap.
+
+19. Entity'leri doğrudan controller üzerinden kullanma.
+
+Ancak bu aşamada CRUD endpointleri oluşturulmadığı için DTO implementasyonunu gereksiz şekilde genişletme.
+
+20. İlk EF Core migration'ını oluştur.
+
+Migration veri modelini, ilişkileri, unique constraint'leri ve category seed kayıtlarını içermelidir.
+
+21. Projenin build edildiğini doğrula.
+
+22. Mümkünse migration'ın başarıyla üretildiğini doğrula.
+
+## Çok Önemli Kurallar
+
+- Henüz Authentication geliştirme.
+- Henüz JWT üretme.
+- Henüz Register/Login endpointi oluşturma.
+- Henüz Expense CRUD geliştirme.
+- Henüz Income CRUD geliştirme.
+- Henüz Budget CRUD geliştirme.
+- Henüz Bill CRUD geliştirme.
+- Henüz Dashboard geliştirme.
+- Henüz AI entegrasyonu yapma.
+- Generic Repository oluşturma.
+- Unit of Work oluşturma.
+- CQRS kullanma.
+- MediatR kullanma.
+- Microservice oluşturma.
+- Gereksiz abstraction ekleme.
+- PROJECT.md veya analiz/mimari dokümanlarını kendiliğinden değiştirme.
+
+Service katmanı daha sonra Entity Framework Core AppDbContext'i doğrudan kullanacaktır.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan dosyalar
+2. Eklenen NuGet paketleri
+3. Oluşturulan entity'ler
+4. Entity ilişkileri
+5. Database constraint'leri
+6. Category seed yaklaşımı
+7. Oluşturulan migration
+8. Connection string'in nasıl configure edileceği
+9. Build sonucu
+10. Henüz bilerek geliştirilmemiş özellikler
+11. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

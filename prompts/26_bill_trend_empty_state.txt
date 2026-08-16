@@ -1,0 +1,85 @@
+Önce PROJECT.md ve docs/DESIGN.md dosyalarını oku.
+
+Flutter Faturalar ekranının manuel testinde küçük bir UX problemi bulundu.
+
+Mevcut davranış:
+Seçili fatura türünde son 6 ay boyunca hiç gerçek fatura verisi yokken kart:
+
+Mar  ₺0,00  Tüketim verisi yok
+Nis  ₺0,00  Tüketim verisi yok
+...
+
+şeklinde altı adet boş/sıfır satır gösteriyor.
+
+İstenen davranış:
+
+Seçili BillType için son 6 aylık trend noktalarının tamamında:
+
+- TotalAmount == 0
+- TotalConsumption == null
+
+ise trend satırlarını gösterme.
+
+Bunun yerine kart içinde:
+
+"Son 6 ay için fatura verisi yok."
+
+mesajı göster.
+
+Önemli davranış:
+
+1. Seçili fatura türünde hiç gerçek veri yoksa:
+   - 6 aylık satırlar gizlenmeli
+   - empty-state mesajı gösterilmeli
+
+2. Seçili fatura türünde en az bir ay gerçek veri varsa:
+   - mevcut 6 aylık trend görünümü aynen korunmalı
+   - diğer boş aylar ₺0,00 / Tüketim verisi yok gösterebilir
+
+3. Elektrik / Su / Doğalgaz sekmeleri bağımsız değerlendirilmelidir.
+
+Örneğin:
+- Elektrik verisi varsa Elektrik trendi gösterilebilir.
+- Su verisi yoksa Su seçildiğinde empty-state gösterilmelidir.
+
+Bu yalnızca Flutter presentation/UX değişikliğidir.
+
+Yapma:
+- backend değiştirme
+- /api/bills/trends contract değiştirme
+- finansal veya tüketim hesabı ekleme
+- null değerleri 0'a çevirme
+- yeni package ekleme
+- refactor yapma
+
+Backend tarafından gelen:
+- TotalAmount
+- TotalConsumption
+- ConsumptionUnit
+
+değerlerini aynen kullanmaya devam et.
+
+Regression test ekle:
+
+- seçili BillType için 6 ayın tamamında TotalAmount=0 ve TotalConsumption=null -> empty-state görünür
+- seçili BillType için en az bir ay TotalAmount>0 -> mevcut trend satırları görünür
+- mümkünse amount=0 fakat gerçek TotalConsumption değeri bulunan bir nokta varsa bunun da veri olarak kabul edildiğini doğrula
+
+Sonunda:
+
+dart format lib test
+flutter analyze
+flutter test
+
+çalıştır.
+
+İş bitiminde raporla:
+
+1. Değiştirilen dosyalar
+2. Empty-state koşulu
+3. BillType bazında nasıl uygulandığı
+4. Eklenen testler
+5. flutter analyze sonucu
+6. flutter test sonucu
+
+Bu görev dışında yeni özellik veya refactor yapma.

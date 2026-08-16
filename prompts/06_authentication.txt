@@ -1,0 +1,205 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Bu dosyalar projenin source of truth dokümanlarıdır.
+
+SmartBudget AI projesinde yalnızca Authentication ve JWT altyapısını geliştir.
+
+Bu aşamada Expense, Income, Budget, Bill, Dashboard ve AI özelliklerine geçme.
+
+## Yapılacaklar
+
+1. Authentication için gerekli DTO'ları oluştur:
+
+- RegisterRequest
+- LoginRequest
+- AuthResponse
+
+Kurallar:
+- RegisterRequest: Email, Password
+- LoginRequest: Email, Password
+- AuthResponse: AccessToken ve istemcinin ihtiyaç duyduğu sınırlı kullanıcı bilgisi
+- Request DTO'larında UserId bulunmamalıdır.
+
+2. AuthService oluştur.
+
+AuthService aşağıdaki işlerden sorumlu olmalıdır:
+
+### Register
+
+- Email boş olamaz.
+- Email normalize edilerek kontrol edilmelidir.
+- Aynı email ile ikinci kullanıcı oluşturulmamalıdır.
+- Password minimum 8 karakter olmalıdır.
+- Password düz metin olarak veritabanına kaydedilmemelidir.
+- Güvenli password hashing kullanılmalıdır.
+- Yeni User için Guid oluşturulmalıdır.
+- CreatedAt UTC olmalıdır.
+- Kayıt başarılıysa kullanıcı veritabanına kaydedilmelidir.
+
+PROJECT.md veya mimari dokümanda kesin olarak belirtilmediyse register işleminden sonra otomatik access token üretme.
+Register response davranışını mevcut kaynaklarla tutarlı ve sade tut.
+
+### Login
+
+- Kullanıcı email ile bulunmalıdır.
+- Password hash üzerinden doğrulanmalıdır.
+- Hatalı email veya password durumunda güvenli ve genel bir authentication hatası dönülmelidir.
+- Kullanıcının var olup olmadığına dair gereksiz bilgi sızdırılmamalıdır.
+- Başarılı login işleminde JWT access token üretilmelidir.
+
+3. JWT üretimi için ayrı ve küçük bir service/helper oluştur.
+
+JWT kuralları:
+
+- Access token süresi 60 dakika olmalıdır.
+- Refresh token oluşturma.
+- Kullanıcı Guid değeri standart user id claim içinde bulunmalıdır.
+- Tercihen JWT subject (`sub`) ve/veya ASP.NET Core tarafından `NameIdentifier` olarak okunabilecek tutarlı claim yaklaşımı kullanılmalıdır.
+- Token içine password, password hash veya hassas finansal veri koyma.
+- JWT signing key source code içine hard-code edilmemelidir.
+- Issuer, Audience ve Key configuration üzerinden okunmalıdır.
+
+4. JWT configuration yaklaşımını oluştur.
+
+Gerekli ayarlar örnek olarak şu yapıda olabilir:
+
+Jwt:
+- Issuer
+- Audience
+- Key
+- ExpirationMinutes
+
+Ancak gerçek secret değeri repository'ye ekleme.
+
+Development ortamında JWT secret için user-secrets veya environment variable kullanılabilecek şekilde yapılandır.
+
+5. ASP.NET Core authentication / authorization middleware yapılandırmasını Program.cs içine ekle.
+
+- AddAuthentication
+- AddJwtBearer
+- AddAuthorization
+- UseAuthentication
+- UseAuthorization
+
+doğru sırada yapılandırılmalıdır.
+
+6. AuthController oluştur.
+
+Endpointler:
+
+POST /api/auth/register
+POST /api/auth/login
+
+Controller ince olmalıdır.
+
+Controller:
+- request almalı,
+- AuthService çağırmalı,
+- uygun HTTP response döndürmeli.
+
+Business logic Controller içine yazılmamalıdır.
+
+7. Authenticated kullanıcı kimliğini claim'den okumak için küçük bir helper/accessor oluştur.
+
+Amaç:
+İleride Expense/Income/Budget/Bill servislerinin authenticated UserId'yi güvenli biçimde kullanabilmesi.
+
+Kurallar:
+
+- Request body veya query içindeki UserId kullanılmamalıdır.
+- UserId JWT claim'den okunmalıdır.
+- Claim Guid olarak parse edilmelidir.
+- Helper kaynak sahipliği kontrolü yapmamalıdır.
+- Yalnızca authenticated user id okuma sorumluluğu taşımalıdır.
+
+8. Password hashing için güvenli bir yaklaşım kullan.
+
+ASP.NET Core'un uygun standart password hashing mekanizmasını tercih et.
+
+Kendi cryptography algoritmanı yazma.
+Düz SHA256 gibi tek yönlü basit hash yaklaşımı kullanma.
+
+9. Authentication hata davranışlarını düzenle.
+
+Beklenen durumlar:
+
+- Geçersiz register input → 400
+- 8 karakterden kısa password → 400
+- Aynı email → tutarlı validation/conflict response
+- Hatalı login → 401
+- Token olmayan korunan endpoint → 401
+- Geçersiz veya süresi dolmuş token → 401
+
+Production response'larında stack trace gösterme.
+
+10. Swagger/OpenAPI kullanılıyorsa JWT Bearer authentication desteğini ekle.
+
+Bu sadece API testini kolaylaştırmak için kullanılmalıdır.
+
+Swagger üzerinden Bearer token girilerek korunan endpointlerin daha sonra test edilebilmesi mümkün olsun.
+
+11. Authentication için temel testler oluştur.
+
+En az aşağıdaki davranışları test et:
+
+- Register başarılı
+- Aynı email ile ikinci register reddedilir
+- 8 karakterden kısa password reddedilir
+- Password veritabanında düz metin değildir
+- Login başarılı
+- Hatalı password ile login reddedilir
+- Login response access token içerir
+- Oluşturulan JWT içinde doğru kullanıcı id claim'i bulunur
+- JWT süresi yaklaşık 60 dakikadır
+- Hassas bilgi token içine eklenmez
+
+Test altyapısını gereksiz karmaşıklaştırma.
+
+12. Build ve testleri çalıştır.
+
+## Çok Önemli Kurallar
+
+- PROJECT.md, ANALIZ.md ve TEKNIK_MIMARI_TASLAK.md ile çelişme.
+- Expense CRUD geliştirme.
+- Income CRUD geliştirme.
+- Budget CRUD geliştirme.
+- Bill CRUD geliştirme.
+- Dashboard geliştirme.
+- AI entegrasyonu geliştirme.
+- Refresh token ekleme.
+- Forgot password / reset password ekleme.
+- Social login ekleme.
+- Role/permission sistemi ekleme.
+- Generic Repository ekleme.
+- Unit of Work ekleme.
+- CQRS ekleme.
+- MediatR ekleme.
+- Microservice yapısı oluşturma.
+- Gereksiz abstraction ekleme.
+- Entity'leri doğrudan API response olarak kullanma.
+- Request DTO'larına UserId ekleme.
+- JWT secret veya gerçek database password'ü repository'ye yazma.
+- Source-of-truth dokümanlarını kendiliğinden değiştirme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen dosyalar
+2. Eklenen NuGet paketleri
+3. Register akışının nasıl çalıştığı
+4. Login akışının nasıl çalıştığı
+5. Password hashing yaklaşımı
+6. JWT claim yapısı
+7. JWT expiration süresi
+8. JWT secret/configuration yaklaşımı
+9. Authenticated UserId accessor yaklaşımı
+10. Endpointler ve HTTP hata davranışları
+11. Swagger JWT desteği
+12. Oluşturulan testler
+13. Build sonucu
+14. Test sonucu
+15. Bilerek geliştirilmemiş authentication özellikleri
+16. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

@@ -1,0 +1,439 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Bu dosyalar projenin source of truth dokümanlarıdır.
+
+SmartBudget AI projesinde yalnızca Dashboard ve aylık finansal özet özelliğini geliştir.
+
+Mevcut Authentication/JWT, Category, Expense, Income, Budget ve Bill yapıları korunmalıdır.
+
+Bu aşamada AI kategorileme ve AI aylık analiz özelliklerine geçme.
+
+## Yapılacaklar
+
+1. Dashboard DTO'larını oluştur.
+
+En az aşağıdaki yapıları oluştur:
+
+- MonthlyDashboardResponse
+- CategoryExpenseSummary
+- BudgetUsageSummary
+- MonthlyTrendPoint
+
+Gereksiz DTO hiyerarşisi oluşturma.
+
+MonthlyDashboardResponse en az şu bilgileri taşımalıdır:
+
+- Year
+- Month
+- TotalIncome
+- TotalExpense
+- Balance
+- CategoryExpenses
+- BudgetUsages
+- PreviousMonthExpenseChangePercent
+- HighestSpendingCategory
+- HighestIncreaseCategory
+- LastSixMonthsTrend
+
+Gerekli alanlarda nullable kullanımını veri yokluğu semantiğine göre belirle.
+
+2. DashboardService oluştur.
+
+DashboardService Entity Framework Core AppDbContext'i doğrudan kullanmalıdır.
+
+Generic Repository veya Unit of Work oluşturma.
+
+DashboardService authenticatedUserId ve istenen raporlama ayı/yılı üzerinden çalışmalıdır.
+
+3. Aylık dönem seçimi
+
+Endpoint varsayılan olarak mevcut Europe/Istanbul ayını göstermelidir.
+
+İsteğe bağlı query parametreleriyle:
+
+- year
+- month
+
+alınabilir.
+
+Kurallar:
+
+- Month 1–12 aralığında olmalıdır.
+- Year desteklenen MVP aralığında olmalıdır.
+- Daha önce Budget için insan tarafından kabul edilen 2000–2100 yıl aralığını kullan.
+- year ve month birlikte verilmelidir.
+- İkisi de verilmezse mevcut Europe/Istanbul ayını kullan.
+- Yalnızca biri verilirse 400 dön.
+
+4. Europe/Istanbul zaman dilimi
+
+Mevcut TimeProvider yaklaşımını kullan.
+
+Yeni paralel tarih/zaman mekanizması oluşturma.
+
+Varsayılan rapor ayı Europe/Istanbul yerel tarihine göre belirlenmelidir.
+
+Expense.Date, Income.Date ve Bill.BillingDate tarih-only alanları olduğu için rapor filtreleri ay/yıl üzerinden güvenli biçimde yapılmalıdır.
+
+5. TotalIncome
+
+Yalnızca authenticated kullanıcının seçilen ay/yıl içindeki Income kayıtlarının toplamı olmalıdır.
+
+Başka kullanıcı kayıtları kesinlikle dahil edilmemelidir.
+
+Veri yoksa 0 dön.
+
+6. TotalExpense
+
+Yalnızca authenticated kullanıcının seçilen ay/yıl içindeki Expense kayıtlarının toplamı olmalıdır.
+
+Başka kullanıcı kayıtları dahil edilmemelidir.
+
+Veri yoksa 0 dön.
+
+7. Balance
+
+Backend tarafından:
+
+Balance = TotalIncome - TotalExpense
+
+olarak hesaplanmalıdır.
+
+AI veya Flutter bu hesabın doğruluk kaynağı olmamalıdır.
+
+8. CategoryExpenses
+
+Seçilen ay/yıl için authenticated kullanıcının Expense kayıtlarını kategori bazında grupla.
+
+Her kategori özeti en az:
+
+- CategoryId
+- CategoryName
+- Amount
+- PercentageOfTotalExpense
+
+içerebilir.
+
+Kurallar:
+
+- Amount backend tarafından hesaplanmalı.
+- PercentageOfTotalExpense backend tarafından hesaplanmalı.
+- TotalExpense = 0 ise sıfıra bölme yapılmamalı.
+- Harcaması olmayan kategorileri response'a eklemek zorunlu değildir.
+- Sonuç deterministik sıralanmalıdır.
+
+Tercihen Amount DESC, CategoryName ASC.
+
+9. BudgetUsages
+
+Authenticated kullanıcının seçilen ay/yıl Budget kayıtlarını kullan.
+
+Her Budget için:
+
+- Category
+- LimitAmount
+- SpentAmount
+- UsagePercent
+- AlertStatus
+
+hesaplarını mevcut Budget kurallarıyla tutarlı üret.
+
+Mevcut BudgetService iş kuralını kopyalayıp farklı sonuç üreten paralel bir mantık oluşturma.
+
+Gerekirse küçük ortak hesaplama yardımcı fonksiyonu/refactor yapılabilir; ancak gereksiz abstraction ekleme.
+
+Kurallar:
+
+- < 80 → Normal
+- >= 80 ve < 100 → Warning
+- >= 100 → Exceeded
+- %100 üzerindeki gerçek oran korunmalı.
+
+10. PreviousMonthExpenseChangePercent
+
+Seçilen ayın toplam giderini bir önceki ayla karşılaştır.
+
+Europe/Istanbul raporlama ayı mantığıyla önceki takvim ayını belirle.
+
+Kurallar:
+
+A) Önceki ay gideri > 0 ise:
+
+(CurrentMonthExpense - PreviousMonthExpense) / PreviousMonthExpense * 100
+
+B) Önceki ay gideri = 0 ve mevcut ay gideri = 0 ise:
+
+0 olarak temsil edilebilir.
+
+C) Önceki ay gideri = 0 ve mevcut ay gideri > 0 ise:
+
+yanıltıcı veya sonsuz yüzde üretme.
+
+Bu durumda PreviousMonthExpenseChangePercent nullable olmalıdır.
+
+API response'ta null değer "hesaplanabilir yüzde yok" anlamına gelmelidir.
+
+11. HighestSpendingCategory
+
+Seçilen ay içinde en yüksek toplam harcamaya sahip kategoriyi backend hesaplamalıdır.
+
+Veri yoksa null olmalıdır.
+
+Eşitlik durumunda sonucu deterministik yap.
+
+Tercihen:
+
+- Amount DESC
+- CategoryName ASC
+
+sıralamasıyla ilk kayıt.
+
+12. HighestIncreaseCategory
+
+Amaç:
+Bu ay hangi harcama kategorisinin geçen aya göre en fazla arttığını belirlemek.
+
+Her kategori için:
+
+CurrentMonthAmount - PreviousMonthAmount
+
+mutlak artışını hesapla.
+
+Kurallar:
+
+- Yalnızca authenticated kullanıcı verileri kullanılmalı.
+- Mevcut ayda veya önceki ayda kayıt olmayan kategori için eksik ay tutarı 0 kabul edilebilir.
+- Artış değeri yalnızca pozitifse aday olarak kabul edilmeli.
+- Hiçbir kategoride pozitif artış yoksa HighestIncreaseCategory null olmalıdır.
+- Eşitlik durumunda deterministik sonuç üret.
+
+Response en az:
+
+- CategoryId
+- CategoryName
+- IncreaseAmount
+
+bilgisini taşıyabilir.
+
+Yüzdesel artış kullanma; önceki ay sıfır olduğunda sorun çıkarmamak için mutlak tutar artışını kullan.
+
+13. LastSixMonthsTrend
+
+Mevcut seçilen rapor ayı dahil geriye doğru 6 aylık finansal trend oluştur.
+
+Her ay için en az:
+
+- Year
+- Month
+- TotalIncome
+- TotalExpense
+- Balance
+
+döndür.
+
+Kurallar:
+
+- Son 6 ay backend tarafından hesaplanmalı.
+- Her ay için nokta bulunmalı.
+- Veri olmayan aylar 0 değerlerle temsil edilebilir.
+- Sonuç kronolojik sırada olmalıdır:
+  en eski ay → en yeni ay.
+- Başka kullanıcı verileri dahil edilmemeli.
+- Bill tüketim trendlerini bu DTO içine kopyalama; Bill trend endpoint'i zaten ayrı.
+
+14. DashboardController oluştur.
+
+Endpoint:
+
+GET /api/dashboard/monthly
+
+Desteklenen kullanım:
+
+GET /api/dashboard/monthly
+→ mevcut Europe/Istanbul ayı
+
+GET /api/dashboard/monthly?year=2026&month=8
+→ seçilen ay
+
+Tüm endpoint authentication gerektirmelidir.
+
+Controller ince olmalıdır.
+
+Controller:
+
+- CurrentUserAccessor üzerinden authenticated UserId almalı,
+- query değerlerini service'e iletmeli,
+- uygun response dönmeli.
+
+Controller içinde finansal hesap yapma.
+
+15. Performans ve sorgu yaklaşımı
+
+- Read-only sorgularda AsNoTracking kullan.
+- Tüm finansal kayıtları memory'ye çekip Flutter'a veya controller'a hesaplatma.
+- Mümkün olan toplama/group-by işlemlerini database sorgularında yap.
+- Ancak gereksiz tek dev LINQ sorgusu oluşturup kodun okunabilirliğini bozma.
+- Kullanıcı filtreleri tüm sorgularda açık olmalıdır.
+
+16. AI sınırı
+
+Bu aşamada AI çağrısı yapma.
+
+Dashboard yalnızca deterministik backend hesaplarından oluşmalıdır.
+
+- LLM çağırma.
+- AI summary üretme.
+- AI tavsiyesi üretme.
+- Harcama yorumlama metni üretme.
+
+Dashboard tamamlandıktan sonraki ayrı aşamada AI aylık analiz bu hazır DTO/veriler üzerinden çalışacaktır.
+
+17. HTTP hata davranışları
+
+Beklenen durumlar:
+
+- Month 1–12 dışında → 400
+- Year 2000–2100 dışında → 400
+- year verilmiş month verilmemiş → 400
+- month verilmiş year verilmemiş → 400
+- Authentication yok/geçersiz → 401
+- Beklenmeyen hata → güvenli 500
+
+Boş finansal veri bir hata değildir.
+
+Veri yoksa dashboard kontrollü sıfır/null değerlerle başarılı response dönebilmelidir.
+
+Production response'larında stack trace gösterme.
+
+18. Testler oluştur.
+
+En az aşağıdaki davranışları test et:
+
+- Varsayılan dashboard ayı Europe/Istanbul mevcut ayıdır
+- year/month query ile seçilen ay hesaplanır
+- Sadece year verilirse reddedilir
+- Sadece month verilirse reddedilir
+- Month 0 reddedilir
+- Month 13 reddedilir
+- Year 1999 reddedilir
+- Year 2101 reddedilir
+
+TotalIncome:
+- yalnızca authenticated kullanıcının seçilen ay gelirleri toplanır
+- başka kullanıcı gelirleri dahil edilmez
+- başka ay gelirleri dahil edilmez
+- veri yoksa 0
+
+TotalExpense:
+- yalnızca authenticated kullanıcının seçilen ay giderleri toplanır
+- başka kullanıcı giderleri dahil edilmez
+- başka ay giderleri dahil edilmez
+- veri yoksa 0
+
+Balance:
+- TotalIncome - TotalExpense doğru hesaplanır
+- negatif balance desteklenir
+
+CategoryExpenses:
+- kategori bazlı toplam doğru
+- başka kullanıcı verisi karışmaz
+- percentage doğru hesaplanır
+- TotalExpense 0 iken sıfıra bölme olmaz
+- sıralama deterministik
+
+BudgetUsages:
+- SpentAmount doğru
+- UsagePercent doğru
+- %80 Warning
+- %100 Exceeded
+- %100 üzeri gerçek oran korunur
+
+PreviousMonthExpenseChangePercent:
+- normal yüzde artışı doğru
+- düşüş negatif yüzde olarak doğru
+- önceki ve mevcut ay 0 → 0
+- önceki ay 0, mevcut ay > 0 → null
+- Ocak ayı için önceki ayın önceki yıl Aralık olması doğru ele alınır
+
+HighestSpendingCategory:
+- doğru kategori seçilir
+- hiç gider yoksa null
+- eşitlik deterministik
+
+HighestIncreaseCategory:
+- mutlak artış doğru hesaplanır
+- önceki ay olmayan kategori 0 baz alınarak hesaplanır
+- pozitif artış yoksa null
+- eşitlik deterministik
+- başka kullanıcı verileri karışmaz
+
+LastSixMonthsTrend:
+- tam 6 nokta döner
+- mevcut ay dahil edilir
+- kronolojik sıralıdır
+- yıl geçişi doğru çalışır
+- boş aylar 0 değerlerle döner
+- kullanıcı izolasyonu korunur
+
+Controller:
+- authentication zorunlu
+- entity doğrudan response değildir
+
+19. Build ve tüm testleri çalıştır.
+
+Mevcut:
+
+- Authentication
+- Category/Expense
+- Income
+- Budget
+- Bill/Trend
+
+testleri geçmeye devam etmelidir.
+
+## Çok Önemli Kurallar
+
+- PROJECT.md, ANALIZ.md ve TEKNIK_MIMARI_TASLAK.md ile çelişme.
+- Mevcut servisleri gereksiz şekilde yeniden yazma.
+- Mevcut endpoint sözleşmelerini gereksiz şekilde değiştirme.
+- AI kategorileme geliştirme.
+- AI aylık analiz geliştirme.
+- Flutter geliştirme.
+- Bill trend mantığını Dashboard içine taşımaya çalışma.
+- Generic Repository ekleme.
+- Unit of Work ekleme.
+- CQRS ekleme.
+- MediatR ekleme.
+- Microservice oluşturma.
+- Request DTO'larına UserId ekleme.
+- Finansal hesaplamaları controller, Flutter veya AI tarafına taşıma.
+- Entity'leri doğrudan API response olarak döndürme.
+- Source-of-truth dokümanlarını kendiliğinden değiştirme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen dosyalar
+2. Dashboard DTO yapısı
+3. Dashboard endpoint sözleşmesi
+4. Europe/Istanbul varsayılan ay yaklaşımı
+5. TotalIncome hesabı
+6. TotalExpense hesabı
+7. Balance hesabı
+8. CategoryExpenses hesabı
+9. BudgetUsages hesabı
+10. PreviousMonthExpenseChangePercent davranışı
+11. HighestSpendingCategory hesabı
+12. HighestIncreaseCategory hesabı
+13. LastSixMonthsTrend hesabı
+14. Ownership/user isolation yaklaşımı
+15. HTTP hata davranışları
+16. Oluşturulan testler
+17. Build sonucu
+18. Toplam test sonucu
+19. Önceki test gruplarının durumu
+20. Bilerek geliştirilmemiş özellikler
+21. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

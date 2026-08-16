@@ -1,0 +1,391 @@
+Bu görev SmartBudget AI projesindeki recurring finansal kayıtlar için küçük ama gerçek bir UX/business-flow düzeltmesidir.
+
+Yeni feature geliştirme.
+Mevcut recurrence mimarisini değiştirme.
+Background scheduler mantığını bozma.
+Gereksiz refactor yapma.
+Migration oluşturma.
+
+Önce oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- prompts/34_recurring_financial_records.txt
+- prompts/35_recurring_auto_realization.txt
+- prompts/36_recurring_midnight_scheduler_revision.txt
+- mevcut RecurringRuleService
+- mevcut RecurringRuleRealizationHostedService
+- ilgili backend testleri
+
+## Gerçek Manuel Testte Bulunan Problem
+
+2026-08-16 günü saat yaklaşık 22:35 Europe/Istanbul'da kullanıcı:
+
+Maaş
+45.000 TL
+StartDate = 2026-08-16
+Her ay
+
+şeklinde recurring Income oluşturdu.
+
+Backend container daha önce çalışmaya başlamış olduğu için startup catch-up kontrolü bu rule oluşturulmadan önce gerçekleşmişti.
+
+Yeni rule başarıyla oluşturuldu ancak aynı gün için otomatik Income hemen oluşmadı.
+
+API:
+
+docker compose restart api
+
+ile yeniden başlatıldığında startup catch-up çalıştı ve Income doğru şekilde otomatik oluştu.
+
+Bu durum otomasyon business logic'inin çalıştığını gösteriyor; ancak kullanıcı bugünün tarihine due bir recurring rule oluşturduğunda backend restart veya bir sonraki midnight kontrolünü beklemek zorunda kalmamalıdır.
+
+## İstenen Davranış
+
+RecurringFinancialRule başarıyla oluşturulduktan sonra backend:
+
+- mevcut Europe/Istanbul tarihini hesaplamalı
+- yeni rule şu an için due ise
+- bu ay için RecurringOccurrence henüz yoksa
+- rule otomatik realization için uygunsa
+
+aynı request akışı içinde veya hemen ardından bu rule'u bir kez otomatik realize etmelidir.
+
+Amaç:
+
+Kullanıcı bugün due bir recurring Income/Expense/fixed Bill oluşturduğunda gerçek finansal kayıt hemen oluşsun.
+
+Backend restart gerekmemeli.
+
+## Örnek
+
+Bugün:
+
+2026-08-16 Europe/Istanbul
+
+Kullanıcı:
+
+Income
+Amount = 45000
+StartDate = 2026-08-16
+Frequency = Monthly
+
+oluşturuyor.
+
+Beklenen:
+
+1. RecurringFinancialRule oluşur.
+2. Aynı ay için occurrence yoksa otomatik realization çalışır.
+3. Gerçek Income oluşur.
+4. Dashboard güncel sorguda 45.000 TL geliri görür.
+5. RecurringOccurrence kaydı oluşur.
+6. Background service daha sonra çalışsa bile duplicate oluşmaz.
+
+## Due Olmayan Rule
+
+Bugün:
+
+2026-08-16
+
+StartDate:
+
+2026-08-20
+
+ise rule sadece plan olarak oluşturulmalıdır.
+
+Gerçek Income/Expense/Bill hemen oluşturulmamalıdır.
+
+## Geçmiş Gün
+
+Bugün:
+
+2026-08-16
+
+StartDate:
+
+2026-08-05
+
+ve bu ay occurrence yoksa:
+
+mevcut automatic catch-up business kuralıyla uyumlu şekilde current month için due kabul edilip hemen realize edilebilir.
+
+Geçmiş ayları backfill etme.
+
+Sadece current month.
+
+## Income
+
+Amount belli recurring Income due ise create sonrası hemen gerçek Income oluştur.
+
+Mevcut IncomeService kullan.
+
+Yeni finansal hesaplama yazma.
+
+## Expense
+
+Amount belli recurring Expense due ise create sonrası hemen gerçek Expense oluştur.
+
+Mevcut ExpenseService kullan.
+
+Budget ve Dashboard mevcut Expense tabanlı hesaplama ile doğal olarak güncellenmeye devam etsin.
+
+## Fixed Bill
+
+Recurring Bill:
+
+Amount != null
+
+ve current month için due ise create sonrası hemen mevcut BillService üzerinden realize et.
+
+Bill -> Expense synchronization korunmalıdır.
+
+Dashboard Bills tablosunu ayrıca toplamasın.
+
+Double counting oluşturma.
+
+## Unknown Amount Bill
+
+Recurring Bill:
+
+Amount == null
+
+ise due olsa bile create sırasında gerçek Bill veya Expense oluşturma.
+
+Rule "due / faturayı gir" durumunda kalmalıdır.
+
+Kullanıcı gerçek Amount ve optional ConsumptionValue girince mevcut realize endpoint kullanılmalıdır.
+
+0 TL sahte Bill oluşturma.
+
+## Duplicate Protection
+
+Mevcut RecurringOccurrence:
+
+RuleId + Year + Month
+
+unique koruması aynen devam etsin.
+
+Create sonrası immediate realization ile BackgroundService aynı anda çalışırsa dahi duplicate finansal kayıt oluşmamalıdır.
+
+Database unique constraint son savunma olarak korunmalıdır.
+
+Race condition nedeniyle kullanıcıya gereksiz 500 dönmemelidir.
+
+Mevcut duplicate handling yaklaşımını yeniden kullan.
+
+## Transaction / Atomicity
+
+Bu noktayı özellikle dikkatli incele.
+
+Rule create başarılı fakat immediate realization başarısız olursa keyfi veri tutarsızlığı üretme.
+
+Mevcut servislerin transaction davranışını incele.
+
+Özellikle BillService kendi transaction'ını kullanıyorsa nested transaction problemi oluşturma.
+
+Büyük mimari refactor yapmadan mevcut güvenli realization yolunu yeniden kullan.
+
+RecurringRuleService içinde zaten automatic realization için ortak:
+
+RealizeCoreAsync
+CreateRealizedRecordAsync
+veya benzeri ortak metotlar varsa bunları yeniden kullan.
+
+Aynı business logic'i ikinci kez kopyalama.
+
+## API Response
+
+Mevcut create recurring endpoint response contract'ını gereksiz yere bozma.
+
+Ancak rule create sonrası immediate realization gerçekleştiğinde response içindeki:
+
+IsRealizedForCurrentMonth
+NextDueDate
+
+gibi backend-calculated alanlar varsa GERÇEK son durumu yansıtmalıdır.
+
+Yani response "Bekleniyor" gösterip gerçekte Income oluşmuş olmamalıdır.
+
+Gerekirse realization sonrası response'u yeniden hesapla.
+
+## Flutter
+
+Temel business fix backend tarafındadır.
+
+Flutter form akışını gereksiz değiştirme.
+
+Ancak recurring create başarılı olduğunda:
+
+- plan listesi
+- transaction/income/expense listesi
+- dashboard
+
+mevcut callback/refresh mekanizmasıyla yeni gerçekleşmiş kaydı göstermiyorsa minimum refresh düzeltmesi yap.
+
+Yeni polling, websocket veya state-management package ekleme.
+
+Özellikle:
+
+Bugün due Income rule oluşturuldu
+→ backend hemen actual Income oluşturdu
+→ kullanıcı forma geri döndüğünde Dashboard ve ilgili ekran refresh edildiğinde yeni Income görünmeli.
+
+Flutter'da recurrence due hesabı yapma.
+
+Backend source of truth olarak kalsın.
+
+## Background Service
+
+RecurringRuleRealizationHostedService davranışını değiştirme.
+
+Şu davranış aynen kalmalı:
+
+startup catch-up
+→ next Europe/Istanbul midnight
+→ run
+→ next midnight
+
+Immediate create-time realization yalnız startup/midnight arasındaki boşluğu kapatan ek bir güvenli tetiktir.
+
+## Europe/Istanbul
+
+Current date/due kararı:
+
+TimeProvider.GetUtcNow()
++
+Europe/Istanbul
+
+ile yapılmalıdır.
+
+DateTime.Now / DateTime.UtcNow kullanma.
+
+## Tests — Backend
+
+En az şu senaryoları ekle:
+
+1. Bugün due Income rule create edilince Income hemen oluşur.
+2. Aynı işlemde RecurringOccurrence oluşur.
+3. Dashboard sorgusu yeni Income'u görür.
+4. Bugünden sonraki gün başlayan Income rule hemen realize edilmez.
+5. Bu ayın geçmiş gününde başlayan due Income current month için hemen realize edilir.
+6. Due Expense create sonrası hemen actual Expense oluşur.
+7. Due Expense Budget spent değerine doğal olarak yansır.
+8. Due fixed Bill create sonrası gerçek Bill oluşur.
+9. Fixed Bill linked Expense oluşur.
+10. Fixed Bill Dashboard'da double count oluşturmaz.
+11. Amount=null Bill due olsa bile otomatik gerçekleşmez.
+12. Amount=null Bill occurrence oluşturmaz ve manuel giriş için due kalır.
+13. Immediate realization sonrası background processor aynı ay çalışınca duplicate oluşmaz.
+14. Aynı rule için concurrent/race duplicate koruması bozulmaz.
+15. Future StartDate rule yalnız plan olarak kalır.
+16. IsActive / EndDate mevcut davranışları bozulmaz.
+17. Europe/Istanbul sınırı doğru çalışır.
+18. Create response realization sonrası doğru IsRealizedForCurrentMonth/NextDueDate döner.
+
+Mevcut tüm recurring/background tests geçmeye devam etmelidir.
+
+## Flutter Tests
+
+Flutter değişikliği gerekiyorsa en az:
+
+1. Due recurring Income create sonrası ilgili financial refresh callback çalışır.
+2. Due recurring Expense aynı şekilde.
+3. Future recurring create yalnız plan refresh yapar veya mevcut UX'i bozmaz.
+4. Unknown amount Bill mevcut "Faturayı Gir" davranışını korur.
+
+Flutter değişikliği gerekmiyorsa sırf test sayısı artırmak için dosya değiştirme.
+
+## Manuel Smoke Test
+
+Development Docker ortamında gerçek PostgreSQL ile doğrula.
+
+Senaryo:
+
+Bugün Europe/Istanbul tarihini kullan.
+
+1. Yeni test user oluştur.
+2. Bugün due bir recurring Income oluştur:
+   Amount = 45000
+   StartDate = bugün
+3. API container'ını restart ETMEDEN:
+   - gerçek Income oluştuğunu
+   - occurrence oluştuğunu
+   - Dashboard TotalIncome'un 45000 arttığını doğrula.
+4. Automatic processor'ı tekrar tetikleyebiliyorsan tetikle ve duplicate olmadığını doğrula.
+5. Future date recurring Income oluştur, actual Income oluşmadığını doğrula.
+6. Amount=null Bill oluştur, actual Bill/Expense oluşmadığını doğrula.
+7. Test verilerini temizle.
+
+Bu smoke testte özellikle:
+
+docker compose restart api
+
+KULLANMA.
+
+Çünkü fix'in amacı restart ihtiyacını ortadan kaldırmaktır.
+
+## Final Doğrulama
+
+Backend:
+
+dotnet build
+dotnet test
+
+Flutter değiştiyse:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+Docker/backend için:
+
+docker compose build
+docker compose up -d
+
+gerekirse gerçek smoke testi çalıştır.
+
+Volume'u destructive şekilde silme.
+
+## AI Çalışma Günlüğü
+
+Bu gerçek manuel testte bulunan bir bug/UX boşluğudur.
+
+docs/AI_CALISMA_GUNLUGU.md içine yeni bir entry ekle.
+
+Açıkça yaz:
+
+- otomasyon backend restart sonrası doğru çalışıyordu
+- insan manuel testinde bugünün due rule'u runtime sırasında oluşturulduğunda bir sonraki scheduler run'ını beklediği fark edildi
+- insan bunun beklenen UX olmadığını belirtti
+- create-time immediate due realization çözümü uygulandı
+- restart gereksinimi kaldırıldı
+- test/smoke sonucu
+
+Uydurma hata ekleme.
+
+## İş Bitiminde Raporla
+
+1. Manuel testte bulunan problem
+2. Kök neden
+3. Uygulanan create-time immediate realization çözümü
+4. Income davranışı
+5. Expense davranışı
+6. Fixed Bill davranışı
+7. Unknown amount Bill davranışı
+8. Duplicate/race protection
+9. Transaction yaklaşımı
+10. Europe/Istanbul davranışı
+11. Background scheduler ile ilişkisi
+12. Flutter refresh değişikliği olup olmadığı
+13. Değiştirilen dosyalar
+14. Migration olup olmadığı
+15. Backend test sonucu
+16. Flutter test sonucu (çalıştırıldıysa)
+17. Docker/PostgreSQL smoke sonucu
+18. Restart kullanmadan bugünün due Income'un hemen oluştuğunun kanıtı
+19. AI log'a eklenen entry numarası
+20. Manuel olarak tekrar kontrol etmemiz gerekenler
+
+Bu görev dışında scope büyütme.

@@ -1,0 +1,468 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut backend ve Flutter implementasyonunu incele.
+
+Manuel mobil testte gerçek bir domain tutarsızlığı bulundu.
+
+## Problem
+
+Şu anda:
+
+İşlemler ekranından "Fatura" kategorili bir Expense oluşturulursa:
+- Expense oluşuyor
+- Dashboard TotalExpense'a yansıyor
+
+Ancak:
+
+Faturalar ekranından Electricity / Water / NaturalGas Bill oluşturulursa:
+- yalnızca Bill oluşuyor
+- Dashboard bunu gider olarak görmüyor
+
+Sonuç olarak aynı ekonomik olay uygulamanın hangi ekranından girildiğine göre Dashboard'a farklı yansıyor.
+
+Bu davranış düzeltilmelidir.
+
+---
+
+# Temel Domain Kararı
+
+Dashboard'ın finansal gider kaynağı Expense olmaya devam etmelidir.
+
+DashboardService içine:
+
+Expenses + Bills
+
+şeklinde ikinci bir finansal toplama mantığı EKLEME.
+
+Bunun yerine gerçek bir Bill oluşturulduğunda ona bağlı bir Expense kaydı da oluştur.
+
+Böylece:
+
+Bill
+↓
+ilişkili Expense
+↓
+Dashboard
+
+akışı oluşur.
+
+Bu sayede Dashboard'ın mevcut deterministik Expense hesaplamaları korunur.
+
+---
+
+# 1. Bill ↔ Expense İlişkisi
+
+Mevcut modeli inceleyerek en küçük ve temiz ilişkiyi ekle.
+
+Tercihen Expense entity'sine nullable:
+
+BillId
+
+eklenebilir.
+
+İlişki:
+
+Expense
+- BillId nullable
+
+Normal manuel Expense için:
+
+BillId = null
+
+Faturalar modülünden oluşturulan Expense için:
+
+BillId = ilgili Bill.Id
+
+Bir Bill'in en fazla bir otomatik finansal Expense karşılığı olmalıdır.
+
+Database seviyesinde mümkünse bu ilişkiyi güvenli hale getir.
+
+Mevcut Guid PK yaklaşımını koru.
+
+Bu değişiklik schema gerektiriyorsa gerekli EF Core migration oluştur.
+
+Migration yalnız bu ilişki için gerekli minimum değişiklikleri içersin.
+
+---
+
+# 2. Fatura Kategorisi
+
+Bill oluşturulurken otomatik Expense:
+
+Category = mevcut seed "Fatura"
+
+olmalıdır.
+
+Kategori adına kör string bağımlılığı eklemek yerine mevcut deterministic seed/category yapısını kullan.
+
+Mevcut category seed Guid sabitse onu source-of-truth olarak güvenli şekilde kullan veya mevcut Category lookup yaklaşımını tercih et.
+
+Yeni kategori oluşturma.
+
+---
+
+# 3. Bill Create Davranışı
+
+POST /api/bills başarılı olduğunda aynı transaction/business operation içinde:
+
+1. Bill oluştur
+2. bağlı Expense oluştur
+
+Expense alanları:
+
+- UserId = authenticated JWT user
+- Amount = Bill.Amount
+- Date = Bill.BillingDate
+- Category = Fatura
+- BillId = created Bill.Id
+- IsAiCategorized = false
+
+Description için kullanıcı dostu deterministik kısa bir değer kullanılabilir.
+
+Örneğin BillType'a göre:
+
+"Elektrik faturası"
+"Su faturası"
+"Doğalgaz faturası"
+
+Ancak mevcut Expense.Description kurallarını incele ve en uygun minimum yaklaşımı seç.
+
+AI kullanma.
+
+---
+
+# 4. Atomicity
+
+Bill + Expense oluşturma tek mantıksal işlem olmalıdır.
+
+Bill oluşturulup Expense oluşturulamazsa yarım veri bırakma.
+
+Mevcut AppDbContext yaklaşımını koruyarak EF/database transaction kullan.
+
+Yeni UnitOfWork abstraction oluşturma.
+
+Beklenen:
+
+ikisi de başarılı
+veya
+ikisi de rollback
+
+---
+
+# 5. Bill Delete
+
+DELETE /api/bills/{id}
+
+başarılı olduğunda Bill'e bağlı otomatik Expense da silinmelidir.
+
+Ownership korunmalıdır.
+
+Başka kullanıcının Bill kaydı üzerinden Expense'a erişim/silme mümkün olmamalıdır.
+
+Delete işlemi de mümkün olduğunca atomic olmalıdır.
+
+---
+
+# 6. Expense Tarafından Silme
+
+Bağlı Bill'den oluşturulmuş Expense'ın İşlemler ekranından bağımsız olarak silinmesi domain tutarsızlığı yaratabilir.
+
+Bu nedenle mevcut UX/API'yi incele ve güvenli minimum davranışı uygula.
+
+Tercih edilen davranış:
+
+BillId != null olan Expense için doğrudan Expense DELETE işlemine izin verme.
+
+Çünkü:
+- Expense silinirse Bill kalır
+- finansal özet yeniden tutarsız olur
+
+Bu durumda kullanıcı dostu bir conflict/validation sonucu dönebilir.
+
+Örneğin:
+"Faturadan oluşturulan gider, Faturalar bölümünden silinmelidir."
+
+Mevcut exception/error contract ile uyumlu ol.
+
+Ancak API contract'ı gereksiz değiştirme.
+
+---
+
+# 7. Expense Listesi
+
+Bill'den otomatik oluşturulan Expense normal Expense listesinde görünmeye devam etmelidir.
+
+Kullanıcı İşlemler ekranında bu finansal hareketi görebilmelidir.
+
+DTO'ya BillId eklemek gerekiyorsa yalnız UI davranışını doğru yönetmek için ekle.
+
+Eğer Expense delete butonunu disable/uyarlamak için gerekli değilse public DTO genişletmesini gereksiz yapma.
+
+Mevcut contract'ı minimum değiştir.
+
+---
+
+# 8. Duplicate / Double Counting
+
+Çok önemli:
+
+Bir Bill oluşturulduğunda yalnız bir Expense oluşturulmalı.
+
+Aynı Bill için ikinci otomatik Expense oluşmamalıdır.
+
+Dashboard:
+- Bill'i ayrıca toplamayacak
+- yalnız Expense üzerinden hesap yapacak
+
+Böylece double counting oluşmayacak.
+
+---
+
+# 9. Existing Data
+
+Development database'de daha önce oluşturulmuş Bill kayıtları olabilir.
+
+Migration sırasında geçmiş Bill'ler için otomatik backfill yapma, eğer bunun için güvenilir business context yoksa.
+
+Bu değişiklikten SONRA oluşturulan Bill kayıtlarının Expense üretmesi yeterlidir.
+
+Mevcut development kayıtlarını bozmadan bırak.
+
+Raporda bunu belirt.
+
+---
+
+# 10. Dashboard Refresh
+
+Flutter tarafında mevcut financial-data refresh mekanizmasını incele.
+
+Bill create/delete başarıyla tamamlandığında Dashboard da stale kalmamalıdır.
+
+Aşağıdaki işlemler sonrası Dashboard refresh trigger oluşmalı:
+
+- Bill create
+- Bill delete
+
+Dashboard backend'den:
+
+GET /api/dashboard/monthly
+
+ile yeniden yüklenmelidir.
+
+Flutter'da local TotalExpense/Balance hesabı yapma.
+
+Bill mutation başarılı fakat Dashboard refresh başarısızsa:
+- Bill işlemini başarısızmış gibi gösterme
+- mutation başarılı kalmalı
+- Dashboard kendi refresh/error davranışını kullanmalı
+
+Mevcut Income/Expense refresh mekanizması varsa yeniden kullan.
+
+Yeni global state management package ekleme.
+
+---
+
+# 11. Budget Etkisi
+
+Bill'den oluşan Expense:
+
+Category = Fatura
+
+olduğu için Fatura kategorisindeki Budget varsa:
+
+SpentAmount
+UsagePercent
+AlertStatus
+
+hesaplarına doğal olarak dahil olmalıdır.
+
+BudgetService/Dashboard hesaplarını özel Bill koduyla değiştirme.
+
+Expense kaynağı sayesinde mevcut hesaplama akışını kullan.
+
+---
+
+# 12. Dashboard Beklenen Davranış
+
+Örnek:
+
+Başlangıç:
+TotalExpense = 1.000 TL
+
+Faturalar bölümünden:
+Electricity Bill = 750 TL
+
+eklenirse:
+
+ilişkili Expense oluşturulmalı.
+
+Yeni Dashboard:
+
+TotalExpense = 1.750 TL
+
+olmalıdır.
+
+Bill ayrıca ikinci kez toplanmamalıdır.
+
+---
+
+# 13. Bill Trend Davranışı
+
+Bill trend sistemi Bill tablosunu kullanmaya devam etmelidir.
+
+Bill Expense'a dönüştü diye:
+
+GET /api/bills/trends
+
+mantığını değiştirme.
+
+Trend:
+- Bill verisinden
+
+Financial Dashboard:
+- Expense verisinden
+
+üretilmeye devam etsin.
+
+---
+
+# 14. Security
+
+Tüm mevcut güvenlik kurallarını koru:
+
+- UserId JWT'den
+- request body'den UserId alma
+- ownership
+- IDOR -> 404
+- başka kullanıcının Bill/Expense ilişkisine erişim yok
+
+Bill -> Expense oluştururken authenticated UserId kullanılmalıdır.
+
+---
+
+# 15. Tests — Backend
+
+Regression/integration testler ekle.
+
+En az:
+
+1. Bill create -> Bill oluşur.
+2. Bill create -> bağlı Expense oluşur.
+3. Expense:
+   - doğru UserId
+   - doğru Amount
+   - doğru Date
+   - Fatura category
+   - IsAiCategorized=false
+4. Electricity description uygun.
+5. Water description uygun.
+6. NaturalGas description uygun.
+7. Bill create sırasında Expense create başarısız olursa yarım Bill bırakılmaz.
+8. Bill delete -> bağlı Expense silinir.
+9. Başka kullanıcının Bill delete denemesi -> 404 ve Expense korunur.
+10. Aynı Bill için duplicate Expense oluşmaz.
+11. Bill sonrası Dashboard TotalExpense doğru artar.
+12. Bill Dashboard'da double count edilmez.
+13. Fatura category Budget varsa SpentAmount Bill Expense nedeniyle artar.
+14. Bill trend mevcut davranışını korur.
+15. Normal manuel Expense BillId=null davranışı bozulmaz.
+16. Bill-linked Expense için bağımsız delete engelleniyorsa bu davranışı test et.
+
+Gerçek PostgreSQL provider ile ilişki/migration davranışını mümkün olan ölçüde doğrula.
+
+---
+
+# 16. Tests — Flutter
+
+Flutter tarafında:
+
+1. Bill create başarılı -> Dashboard refresh trigger.
+2. Bill delete başarılı -> Dashboard refresh trigger.
+3. Bill create başarısız -> Dashboard refresh yok.
+4. Bill delete başarısız -> Dashboard refresh yok.
+5. Refresh failure başarılı Bill mutation'ını başarısız göstermiyor.
+6. Mevcut Bill list/trend refresh davranışı korunuyor.
+
+---
+
+# 17. Migration
+
+Schema değişikliği gerekiyorsa yalnız gerekli migration oluştur.
+
+Migration'ı development PostgreSQL'e uygula.
+
+Mevcut veriyi yanlışlıkla silme/resetleme.
+
+Database drop yapma.
+
+---
+
+# 18. Yapma
+
+- Dashboard'da Expenses + Bills toplama
+- double counting
+- AI kullanma
+- recurring/periyodik sistemi BU GÖREVDE yapma
+- yeni state management package
+- repository/UoW
+- CQRS/MediatR
+- büyük refactor
+- yeni BillType
+- payment status
+- future bill prediction
+- production deployment
+
+Periyodik gelir/gider/fatura özelliği ayrı görevde yapılacaktır.
+
+---
+
+# 19. Final Doğrulama
+
+Backend:
+
+dotnet build
+dotnet test
+
+Development PostgreSQL:
+
+- migration uygulanmış mı
+- Bill create sonrası Expense oluşuyor mu
+- Dashboard artıyor mu
+- Bill delete sonrası Expense siliniyor mu
+- Dashboard geri düşüyor mu
+
+Flutter:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+---
+
+# İş Bitiminde Raporla
+
+1. Root cause / domain inconsistency
+2. Yeni Bill ↔ Expense ilişkisinin yapısı
+3. Değiştirilen entity/configuration dosyaları
+4. Migration adı ve değişikliği
+5. Bill create atomic davranışı
+6. Bill delete davranışı
+7. Bill-linked Expense delete politikası
+8. Dashboard'ın neden yalnız Expense toplamaya devam ettiği
+9. Double counting'in nasıl engellendiği
+10. Budget etkisi
+11. Flutter Dashboard refresh davranışı
+12. Backend test sonucu
+13. Flutter test sonucu
+14. flutter analyze sonucu
+15. APK build sonucu
+16. Gerçek PostgreSQL smoke sonucu
+17. Manuel emulator üzerinde tekrar test edilmesi gereken noktalar
+
+Bu görev dışında recurring/periyodik feature geliştirme.

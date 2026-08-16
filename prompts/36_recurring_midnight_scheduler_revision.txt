@@ -1,0 +1,164 @@
+Önce PROJECT.md, prompts/34_recurring_financial_records.txt ve
+prompts/35_recurring_auto_realization.txt dosyalarını oku.
+
+Mevcut recurring automatic realization implementasyonunu incele.
+
+Bu görev küçük bir İNSAN REVİZYONUDUR.
+
+## Problem
+
+Mevcut RecurringRuleRealizationHostedService:
+
+- uygulama başlangıcında bir kez çalışıyor
+- ardından 60 dakikada bir recurring rule kontrolü yapıyor
+
+Bu işlevsel olmakla birlikte kullanıcının açık beklentisini tam karşılamıyor.
+
+Kullanıcı monthly recurring kayıtların ilgili gün:
+
+00:00 Europe/Istanbul
+
+itibarıyla otomatik gerçekleşmesini bekliyor.
+
+Saatlik polling nedeniyle kayıt teorik olarak 00:00–01:00 arasında herhangi bir zamanda gerçekleşebilir.
+
+## İstenen Davranış
+
+Hosted service:
+
+1. Backend başladığında bir kez hemen catch-up kontrolü yapmalı.
+2. Daha sonra Europe/Istanbul timezone'a göre bir sonraki gece yarısını hesaplamalı.
+3. Bir sonraki 00:00 Europe/Istanbul zamanına kadar beklemeli.
+4. Gece yarısında RunAutomaticRealizationAsync çalıştırmalı.
+5. Ardından bir sonraki Istanbul gece yarısını TEKRAR hesaplamalı.
+
+Sabit:
+
+Task.Delay(TimeSpan.FromDays(1))
+
+kullanma.
+
+Her döngüde bir sonraki Istanbul midnight yeniden hesaplanmalıdır.
+
+## Startup Catch-up
+
+Mevcut startup catch-up davranışını koru.
+
+Örnek:
+
+Recurring day = ayın 16'sı
+
+Backend:
+16 Ağustos 00:00'da kapalı
+
+Backend:
+16 Ağustos 10:30'da açıldı
+
+=> startup kontrolünde occurrence yoksa gerçek kayıt oluşturulmalı.
+
+Ancak geçmiş ayları topluca backfill etme.
+
+## Timezone
+
+Kaynak:
+
+TimeProvider.GetUtcNow()
+
+olmalıdır.
+
+Scheduling hesabında Europe/Istanbul timezone kullanılmalıdır.
+
+DateTime.Now / DateTime.UtcNow kullanma.
+
+TimeProvider test edilebilirliği korunmalıdır.
+
+## Recurrence Business Logic
+
+RecurringRuleService içindeki mevcut:
+
+- due kontrolü
+- Income realization
+- Expense realization
+- fixed Bill realization
+- unknown Bill davranışı
+- occurrence duplicate protection
+- 29/30/31 helper
+- EndDate
+- IsActive
+
+mantığına dokunma.
+
+Bu görev yalnız hosted-service scheduling zamanlamasını düzeltmek içindir.
+
+## Polling
+
+60 dakikalık sürekli polling'i kaldır.
+
+Background service finansal tablolara her saat gereksiz sorgu atmamalıdır.
+
+Normal çalışma:
+
+startup check
+→ next Istanbul midnight
+→ check
+→ next Istanbul midnight
+→ check
+
+olmalıdır.
+
+## Exception Safety
+
+Bir gece yarısı çalıştırması exception üretirse hosted service tamamen ölmemelidir.
+
+Logla ve bir sonraki Istanbul midnight için scheduling'e devam et.
+
+Secret veya hassas finansal değer loglama.
+
+CancellationToken düzgün kullanılmalıdır.
+
+## Tests
+
+Hosted service'in saatlerce gerçekten beklediği test yazma.
+
+Schedule/delay hesaplama mantığını mümkünse test edilebilir helper/metoda ayır.
+
+En az:
+
+1. Istanbul saati 23:30 ise next run = ertesi gün 00:00.
+2. Istanbul saati 00:30 ise next run = ertesi gün 00:00.
+3. UTC → Europe/Istanbul dönüşümü doğru.
+4. Startup catch-up çağrısı korunuyor.
+5. Bir run hata verse service sonraki scheduling davranışını kaybetmiyor.
+6. Mevcut recurring automation testlerinin tamamı geçiyor.
+
+## Yapma
+
+- Hangfire
+- Quartz
+- üçüncü parti scheduler
+- Windows Task Scheduler
+- cron dependency
+- migration
+- entity değişikliği
+- Flutter değişikliği
+- recurrence business logic refactor
+- yeni feature
+
+## Son Doğrulama
+
+dotnet build
+dotnet test
+
+Migration gerekmez.
+
+İş bitiminde raporla:
+
+1. Eski hourly polling davranışı
+2. Yeni midnight scheduling davranışı
+3. Startup catch-up davranışı
+4. Europe/Istanbul hesabı
+5. Delay'in nasıl hesaplandığı
+6. Exception/cancellation davranışı
+7. Değiştirilen dosyalar
+8. Test sonucu
+9. Migration olmadığı

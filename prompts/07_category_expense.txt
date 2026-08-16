@@ -1,0 +1,273 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Bu dosyalar projenin source of truth dokümanlarıdır.
+
+SmartBudget AI projesinde yalnızca Category ve Expense özelliklerini geliştir.
+
+Authentication/JWT altyapısı hazırdır ve korunmalıdır.
+
+Bu aşamada Income, Budget, Bill, Dashboard ve AI aylık analiz özelliklerine geçme.
+
+## Yapılacaklar
+
+1. Category yapısını tamamla.
+
+Kategori listesi database seed ile zaten oluşturulmuştur:
+
+- Market
+- Ulaşım
+- Fatura
+- Eğlence
+- Sağlık
+- Eğitim
+- Kira
+- Diğer
+
+Yeni kategori oluşturma endpointi geliştirme.
+Kategori güncelleme veya silme endpointi geliştirme.
+
+Sadece authenticated kullanıcıların kullanabileceği:
+
+GET /api/categories
+
+endpointini oluştur.
+
+Endpoint tanımlı kategorileri Id ve Name bilgisiyle döndürmelidir.
+
+Category entity doğrudan API response olarak kullanılmamalıdır.
+CategoryResponse DTO kullan.
+
+2. Expense DTO'larını oluştur.
+
+En az:
+
+CreateExpenseRequest
+ExpenseResponse
+ExpenseListItemResponse
+
+oluştur.
+
+CreateExpenseRequest alanları:
+
+- Amount
+- Description
+- CategoryId
+- Date
+- IsAiCategorized
+
+Kurallar:
+
+- UserId request içinde bulunmamalıdır.
+- Amount > 0 olmalıdır.
+- Description boş veya whitespace olamaz.
+- CategoryId geçerli bir kategoriye ait olmalıdır.
+- Date zorunlu olmalıdır.
+- IsAiCategorized yalnızca kaydedilen kategorinin AI önerisinden gelip gelmediğini belirtir.
+- IsAiCategorized hiçbir authorization veya kategori doğrulama kararını etkilememelidir.
+
+3. ExpenseService oluştur.
+
+ExpenseService Entity Framework Core AppDbContext'i doğrudan kullanmalıdır.
+
+Generic Repository veya Unit of Work oluşturma.
+
+ExpenseService aşağıdaki işlerden sorumlu olmalıdır:
+
+### Expense oluşturma
+
+- authenticatedUserId parametresi al.
+- UserId request'ten alma.
+- Amount > 0 doğrula.
+- Description trim et.
+- Description boşsa reddet.
+- CategoryId'nin mevcut seed kategorilerinden biri olduğunu veritabanından doğrula.
+- Geçersiz CategoryId ile kayıt oluşturma.
+- UserId alanını authenticatedUserId değerinden ata.
+- Yeni Guid oluştur.
+- CreatedAt UTC olarak oluştur.
+- Date alanını request'ten tarih-only mantığıyla kullan.
+- Expense kaydını veritabanına kaydet.
+- Entity yerine ExpenseResponse döndür.
+
+### Expense listesi
+
+Authenticated kullanıcının yalnızca kendi giderlerini döndür.
+
+Başka kullanıcıların giderleri hiçbir koşulda listeye karışmamalıdır.
+
+Liste için uygun projection/DTO kullan.
+Gereksiz entity tracking kullanma.
+
+Liste sıralamasını deterministik yap.
+Tercihen Date descending, aynı tarihte CreatedAt descending kullan.
+
+### Expense detayı
+
+GET /api/expenses/{id}
+
+- Kayıt hem Expense Id hem authenticated UserId ile aranmalıdır.
+- Önce yalnızca Id ile bulup sonra ownership kontrolü yapma.
+- Başka kullanıcıya ait veya bulunmayan kayıt için aynı 404 yaklaşımını kullan.
+- Kayıt içeriği sızdırılmamalıdır.
+
+### Expense silme
+
+DELETE /api/expenses/{id}
+
+- Kayıt hem Id hem authenticated UserId ile aranmalıdır.
+- Başka kullanıcıya ait veya bulunmayan kayıt için 404 dön.
+- Kullanıcı yalnızca kendi giderini silebilmelidir.
+- Başarılı silmede uygun HTTP response kullan.
+
+4. ExpensesController oluştur.
+
+Endpointler:
+
+GET /api/expenses
+GET /api/expenses/{id}
+POST /api/expenses
+DELETE /api/expenses/{id}
+
+Tüm endpointler authentication gerektirmelidir.
+
+Controller ince olmalıdır.
+
+Controller:
+
+- CurrentUserAccessor üzerinden authenticated user id almalı,
+- ilgili service metodunu çağırmalı,
+- HTTP response üretmeli.
+
+Business logic Controller içine yazılmamalıdır.
+
+5. CurrentUserAccessor mevcut yapısını kullan.
+
+Yeni bir kullanıcı kimliği okuma mekanizması oluşturma.
+
+Request body, query veya route üzerinden UserId kabul etme.
+
+6. Category doğrulaması backend tarafında zorunlu olmalıdır.
+
+Flutter'ın veya ileride AI servisinin geçerli CategoryId göndermiş olması güvenilir kabul edilmemelidir.
+
+Her Expense oluşturma işleminde CategoryId backend tarafından doğrulanmalıdır.
+
+AI yeni kategori oluşturamaz.
+
+7. Hata davranışları
+
+Beklenen durumlar:
+
+- Amount <= 0 → 400
+- Description boş/whitespace → 400
+- Geçersiz CategoryId → 400
+- Authentication yok/geçersiz → 401
+- Başka kullanıcı expense id'sine erişim → 404
+- Bulunmayan expense → 404
+- Beklenmeyen hata → güvenli 500
+
+Production response'larında stack trace gösterme.
+
+Mevcut merkezi hata yönetimini kullan.
+
+8. Expense response yapısı
+
+ExpenseResponse içinde en az:
+
+- Id
+- Amount
+- Description
+- Category
+- Date
+- CreatedAt
+- IsAiCategorized
+
+bulunmalıdır.
+
+Category için yalnızca gerekli Id/Name bilgisini döndür.
+Entity navigation object'ini doğrudan serialize etme.
+
+9. AI entegrasyonu yapma.
+
+Bu aşamada:
+
+- LLM çağrısı yapma.
+- AI kategorileme endpointi oluşturma.
+- Otomatik kategori tahmini yapma.
+
+Sadece IsAiCategorized alanını gelecekteki AI akışı için sakla.
+
+Manuel CategoryId ile Expense oluşturma tamamen çalışmalıdır.
+
+10. Testler oluştur.
+
+En az aşağıdaki davranışları test et:
+
+- Kategori listesi 8 seed kategoriyi döndürüyor.
+- Başarılı expense oluşturma.
+- Expense UserId request'ten değil authenticated user id'den atanıyor.
+- Amount 0 reddediliyor.
+- Negatif Amount reddediliyor.
+- Boş Description reddediliyor.
+- Whitespace Description reddediliyor.
+- Geçersiz CategoryId reddediliyor.
+- Geçerli CategoryId ile expense oluşturuluyor.
+- Expense listesi yalnızca authenticated kullanıcı kayıtlarını döndürüyor.
+- Liste sıralaması deterministik.
+- Expense detail yalnızca sahibine dönüyor.
+- Başka kullanıcı expense detail isteğinde 404.
+- Expense delete yalnızca sahibine izin veriyor.
+- Başka kullanıcı expense delete isteğinde 404.
+- Silinen expense artık listede görünmüyor.
+- Response entity yerine DTO kullanıyor.
+- IsAiCategorized değeri doğru saklanıp dönüyor.
+
+Test altyapısını gereksiz karmaşıklaştırma.
+
+Mümkün olduğunca mevcut test yapısını kullan.
+
+11. Build ve testleri çalıştır.
+
+Tüm mevcut Authentication testleri de çalışmaya devam etmelidir.
+
+## Çok Önemli Kurallar
+
+- PROJECT.md, ANALIZ.md ve TEKNIK_MIMARI_TASLAK.md ile çelişme.
+- Mevcut Authentication/JWT yapısını gereksiz şekilde değiştirme.
+- Income geliştirme.
+- Budget geliştirme.
+- Bill geliştirme.
+- Dashboard geliştirme.
+- AI kategorileme geliştirme.
+- AI aylık analiz geliştirme.
+- Category create/update/delete endpointi ekleme.
+- Generic Repository ekleme.
+- Unit of Work ekleme.
+- CQRS ekleme.
+- MediatR ekleme.
+- Microservice yapısı oluşturma.
+- Role/permission sistemi ekleme.
+- Request DTO'larına UserId ekleme.
+- Entity'leri doğrudan API response olarak döndürme.
+- Source-of-truth dokümanlarını kendiliğinden değiştirme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen dosyalar
+2. Category endpointinin çalışma şekli
+3. Expense DTO'ları
+4. Expense create akışı
+5. Ownership yaklaşımı
+6. Category validation yaklaşımı
+7. Expense list/detail/delete davranışları
+8. HTTP hata davranışları
+9. Oluşturulan testler
+10. Build sonucu
+11. Toplam test sonucu
+12. Mevcut Authentication testlerinin durumu
+13. Bilerek geliştirilmemiş özellikler
+14. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

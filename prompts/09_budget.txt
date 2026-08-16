@@ -1,0 +1,333 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Bu dosyalar projenin source of truth dokümanlarıdır.
+
+SmartBudget AI projesinde yalnızca Budget özelliğini geliştir.
+
+Mevcut Authentication/JWT, Category, Expense ve Income yapıları korunmalıdır.
+
+Bu aşamada Bill, Dashboard ve AI özelliklerine geçme.
+
+## Yapılacaklar
+
+1. Budget DTO'larını oluştur.
+
+En az:
+
+- CreateBudgetRequest
+- UpdateBudgetRequest
+- BudgetResponse
+- BudgetListItemResponse
+
+oluştur.
+
+CreateBudgetRequest alanları:
+
+- CategoryId
+- LimitAmount
+- Month
+- Year
+
+UpdateBudgetRequest alanları:
+
+- LimitAmount
+
+Kurallar:
+
+- UserId request içinde bulunmamalıdır.
+- LimitAmount > 0 olmalıdır.
+- Month 1 ile 12 arasında olmalıdır.
+- Year geçerli ve mantıklı bir yıl olmalıdır.
+- CategoryId backend tarafından doğrulanmalıdır.
+- Update işleminde CategoryId, Month ve Year değiştirilememelidir.
+
+2. BudgetService oluştur.
+
+BudgetService Entity Framework Core AppDbContext'i doğrudan kullanmalıdır.
+
+Generic Repository veya Unit of Work oluşturma.
+
+BudgetService aşağıdaki işlerden sorumlu olmalıdır:
+
+### Budget oluşturma
+
+- authenticatedUserId parametresi al.
+- UserId request'ten alma.
+- LimitAmount > 0 doğrula.
+- Month değerini 1–12 aralığında doğrula.
+- Year değerini doğrula.
+- CategoryId'nin mevcut seed kategorilerinden biri olduğunu backend tarafında doğrula.
+- Aynı authenticated kullanıcı + CategoryId + Month + Year için ikinci Budget oluşturulmasını engelle.
+- Database unique constraint mevcut olsa da uygulama seviyesinde de kontrollü duplicate kontrolü yap.
+- Yeni Guid oluştur.
+- UserId alanını authenticatedUserId değerinden ata.
+- CreatedAt UTC oluştur.
+- Budget kaydını veritabanına kaydet.
+- Entity yerine BudgetResponse döndür.
+
+### Budget listesi
+
+Authenticated kullanıcının yalnızca kendi Budget kayıtlarını döndür.
+
+Başka kullanıcıların Budget kayıtları hiçbir koşulda listeye karışmamalıdır.
+
+AsNoTracking ve DTO projection kullan.
+
+Liste sıralamasını deterministik yap.
+
+Tercihen:
+
+- Year descending
+- Month descending
+- Category Name ascending
+- Id ascending
+
+kullan.
+
+### Budget update
+
+PUT /api/budgets/{id}
+
+- Kayıt hem Id hem authenticated UserId ile aranmalıdır.
+- Önce yalnızca Id ile bulup sonra ownership kontrolü yapma.
+- Update işleminde yalnızca LimitAmount değiştirilebilmelidir.
+- CategoryId, Month ve Year değiştirilememelidir.
+- Yeni LimitAmount > 0 olmalıdır.
+- Başka kullanıcıya ait veya bulunmayan kayıt için aynı güvenli 404 yaklaşımını kullan.
+- Başarılı update BudgetResponse döndürmelidir.
+
+### Budget silme
+
+DELETE /api/budgets/{id}
+
+- Kayıt hem Id hem authenticated UserId ile aranmalıdır.
+- Başka kullanıcıya ait veya bulunmayan kayıt için 404 dön.
+- Kullanıcı yalnızca kendi Budget kaydını silebilmelidir.
+- Başarılı silmede 204 No Content dön.
+
+3. Budget kullanım hesaplamasını backend tarafında yap.
+
+Her Budget response için aşağıdaki değerleri hesapla:
+
+- LimitAmount
+- SpentAmount
+- UsagePercent
+- AlertStatus
+
+SpentAmount:
+
+Aynı authenticated kullanıcı,
+aynı CategoryId,
+aynı Month ve Year
+
+içindeki Expense kayıtlarının toplamı olmalıdır.
+
+Başka kullanıcı verileri kesinlikle hesaba katılmamalıdır.
+
+4. UsagePercent hesaplama kuralı
+
+Backend:
+
+UsagePercent = (SpentAmount / LimitAmount) * 100
+
+olarak hesaplamalıdır.
+
+Kurallar:
+
+- LimitAmount her zaman > 0 olduğu için sıfıra bölme oluşmamalıdır.
+- Sonuç %100'ü aşarsa gerçek oran korunmalıdır.
+- Sonucu yapay olarak %100 ile sınırlandırma.
+- Finansal hesapları Flutter veya AI tarafına taşıma.
+
+5. AlertStatus kuralı
+
+Aşağıdaki deterministik durumları kullan:
+
+- UsagePercent < 80 → Normal
+- UsagePercent >= 80 ve < 100 → Warning
+- UsagePercent >= 100 → Exceeded
+
+Tam %80 → Warning olmalıdır.
+Tam %100 → Exceeded olmalıdır.
+
+AlertStatus için sade enum veya kontrollü string yaklaşımı kullanılabilir.
+Gereksiz abstraction oluşturma.
+
+6. BudgetResponse
+
+BudgetResponse içinde en az:
+
+- Id
+- Category
+- LimitAmount
+- Month
+- Year
+- SpentAmount
+- UsagePercent
+- AlertStatus
+- CreatedAt
+
+bulunmalıdır.
+
+Category için entity navigation object'i doğrudan serialize etme.
+Sınırlı CategoryResponse veya eşdeğer DTO kullan.
+
+7. BudgetsController oluştur.
+
+Endpointler:
+
+GET /api/budgets
+POST /api/budgets
+PUT /api/budgets/{id}
+DELETE /api/budgets/{id}
+
+Tüm endpointler authentication gerektirmelidir.
+
+Controller ince olmalıdır.
+
+Controller:
+
+- CurrentUserAccessor üzerinden authenticated UserId almalı,
+- ilgili BudgetService metodunu çağırmalı,
+- uygun HTTP response üretmeli.
+
+Business logic Controller içine yazılmamalıdır.
+
+8. Category doğrulaması
+
+Create işleminde CategoryId her zaman backend tarafından doğrulanmalıdır.
+
+Flutter'ın geçerli kategori göndermiş olması güvenilir kabul edilmemelidir.
+
+9. Duplicate Budget davranışı
+
+Aynı:
+
+UserId + CategoryId + Month + Year
+
+için ikinci aktif Budget oluşturulamaz.
+
+Mevcut database unique index korunmalıdır.
+
+Uygulama seviyesinde duplicate kontrolünden sonra yine de database concurrency nedeniyle unique constraint ihlali oluşursa bunu kullanıcıya güvenli conflict/validation davranışıyla dönüştürmeye çalış.
+
+Gereksiz özel exception hiyerarşisi oluşturma.
+
+10. Europe/Istanbul zaman dilimi
+
+Budget'ın Month ve Year değerleri açık olarak saklandığı için doğrudan bu alanları kullan.
+
+SpentAmount hesaplanırken Expense.Date tarih-only alanının Month ve Year değerleri bütçeyle karşılaştırılmalıdır.
+
+Bu aşamada AI veya mobil tarafta tarih hesabı yaptırma.
+
+11. HTTP hata davranışları
+
+Beklenen durumlar:
+
+- LimitAmount <= 0 → 400
+- Month < 1 veya Month > 12 → 400
+- Geçersiz Year → 400
+- Geçersiz CategoryId → 400
+- Duplicate Budget → 409 veya mevcut tutarlı conflict davranışı
+- Authentication yok/geçersiz → 401
+- Başka kullanıcıya ait Budget → 404
+- Bulunmayan Budget → 404
+- Beklenmeyen hata → güvenli 500
+
+Production response'larında stack trace gösterme.
+
+Mevcut merkezi hata yönetimini kullan.
+
+12. Testler oluştur.
+
+En az aşağıdaki davranışları test et:
+
+- Başarılı Budget oluşturma
+- UserId request'ten değil authenticated user id'den atanıyor
+- LimitAmount 0 reddediliyor
+- Negatif LimitAmount reddediliyor
+- Month 0 reddediliyor
+- Month 13 reddediliyor
+- Geçersiz Year reddediliyor
+- Geçersiz CategoryId reddediliyor
+- Aynı UserId + CategoryId + Month + Year duplicate Budget reddediliyor
+- Farklı kullanıcı aynı CategoryId + Month + Year için Budget oluşturabiliyor
+- Farklı ay için Budget oluşturulabiliyor
+- Farklı kategori için Budget oluşturulabiliyor
+- Liste yalnızca authenticated kullanıcının Budget kayıtlarını döndürüyor
+- Başka kullanıcı Budget'ları listeye karışmıyor
+- Liste sıralaması deterministik
+- SpentAmount yalnızca aynı kullanıcı/kategori/ay/yıl Expense kayıtlarından hesaplanıyor
+- Başka kullanıcı Expense'ları SpentAmount'a katılmıyor
+- Başka kategori Expense'ları SpentAmount'a katılmıyor
+- Başka ay Expense'ları SpentAmount'a katılmıyor
+- UsagePercent doğru hesaplanıyor
+- %80 tam olarak Warning
+- %100 tam olarak Exceeded
+- %100 üzerindeki gerçek oran korunuyor
+- %80 altı Normal
+- Update yalnızca LimitAmount değiştiriyor
+- Başka kullanıcı Budget update isteğinde 404
+- Delete yalnızca sahibine izin veriyor
+- Başka kullanıcı Budget delete isteğinde 404
+- Silinen Budget listeden kaldırılıyor
+- Response entity yerine DTO kullanıyor
+
+Mümkün olduğunca mevcut test altyapısını kullan.
+
+13. Build ve tüm testleri çalıştır.
+
+Mevcut:
+
+- Authentication
+- Category/Expense
+- Income
+
+testleri geçmeye devam etmelidir.
+
+## Çok Önemli Kurallar
+
+- PROJECT.md, ANALIZ.md ve TEKNIK_MIMARI_TASLAK.md ile çelişme.
+- Mevcut Authentication/JWT yapısını gereksiz şekilde değiştirme.
+- Mevcut Category/Expense yapısını gereksiz şekilde değiştirme.
+- Mevcut Income yapısını gereksiz şekilde değiştirme.
+- Bill geliştirme.
+- Dashboard geliştirme.
+- AI kategorileme geliştirme.
+- AI aylık analiz geliştirme.
+- Budget CategoryId update etme.
+- Budget Month update etme.
+- Budget Year update etme.
+- Generic Repository ekleme.
+- Unit of Work ekleme.
+- CQRS ekleme.
+- MediatR ekleme.
+- Microservice yapısı oluşturma.
+- Request DTO'larına UserId ekleme.
+- Finansal hesaplamaları AI'a veya Flutter'a taşıma.
+- Entity'leri doğrudan API response olarak döndürme.
+- Source-of-truth dokümanlarını kendiliğinden değiştirme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen dosyalar
+2. Budget DTO'ları
+3. Budget create akışı
+4. Duplicate Budget kontrolü
+5. Ownership yaklaşımı
+6. Budget list/update/delete davranışları
+7. SpentAmount hesaplama yaklaşımı
+8. UsagePercent hesaplama yaklaşımı
+9. AlertStatus kuralları
+10. HTTP hata davranışları
+11. Oluşturulan testler
+12. Build sonucu
+13. Toplam test sonucu
+14. Önceki test gruplarının durumu
+15. Bilerek geliştirilmemiş özellikler
+16. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

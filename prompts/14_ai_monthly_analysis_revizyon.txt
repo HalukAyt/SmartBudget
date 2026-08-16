@@ -1,0 +1,240 @@
+Önce PROJECT.md, docs/ANALIZ.md ve docs/TEKNIK_MIMARI_TASLAK.md dosyalarını oku.
+
+Ardından mevcut AI aylık analiz implementasyonunu ve özellikle:
+
+- AiMonthlyAnalysisService
+- OpenAiMonthlyAnalysisClient
+- ilgili DTO'lar
+- ilgili testler
+
+üzerinden mevcut davranışı incele.
+
+Bu bir revizyon görevidir.
+
+Yeni özellik geliştirme.
+
+Mevcut AI aylık analiz özelliğinde insan kontrolü sırasında bir problem tespit edildi:
+
+AI tarafından üretilen Analysis metninde herhangi bir sayısal karakter bulunması durumunda
+response tamamen reddediliyor.
+
+Bu yaklaşım gereğinden fazla katıdır.
+
+Backend tarafından AI'a gönderilen finansal özet zaten deterministik olarak hesaplanmış ve
+güvenilir değerlerden oluşmaktadır.
+
+AI'ın bu özet içerisinde kendisine açıkça verilmiş sayısal değerleri yorum metninde kullanabilmesi gerekir.
+
+Örneğin AI'a backend tarafından:
+
+- TotalExpense
+- Balance
+- PercentageOfTotalExpense
+- LimitAmount
+- SpentAmount
+- UsagePercent
+- PreviousMonthExpenseChangePercent
+- IncreaseAmount
+
+gibi değerler gönderiliyorsa, AI'ın bu mevcut değerlerden birini yorum metninde ifade etmesi
+tek başına güvenlik ihlali değildir.
+
+## Yapılacak Revizyon
+
+1. Analysis metninde herhangi bir rakam bulunmasını otomatik failure sebebi yapan genel kontrolü kaldır.
+
+Örneğin:
+
+"metinde herhangi bir 0-9 karakteri varsa reddet"
+
+gibi blanket/broad kontrol olmamalıdır.
+
+2. Finansal halüsinasyon korumasını tamamen kaldırma.
+
+Amaç:
+
+AI'ın yeni rakam uydurmasını azaltmak,
+fakat backend tarafından sağlanan rakamları kullanmasını engellememektir.
+
+3. Tercih edilen doğrulama yaklaşımı:
+
+AI çıktısında sayısal değer bulunuyorsa mümkün olduğunca bunların backend tarafından AI'a verilen
+MonthlyDashboardResponse özetindeki izinli sayısal değerlerden türeyip türemediğini kontrol et.
+
+Gereksiz karmaşık NLP veya finansal parser sistemi oluşturma.
+
+Sade ve test edilebilir bir yaklaşım kullan.
+
+Örneğin AI'a gönderilen summary içerisindeki sayısal değerlerden kontrollü bir allowed-number set
+oluşturulabilir.
+
+Bu set aşağıdaki backend hesaplanmış değerlerden üretilebilir:
+
+- TotalIncome
+- TotalExpense
+- Balance
+- Category expense Amount
+- PercentageOfTotalExpense
+- Budget LimitAmount
+- Budget SpentAmount
+- Budget UsagePercent
+- PreviousMonthExpenseChangePercent
+- HighestSpendingCategory Amount mevcutsa
+- HighestIncreaseCategory IncreaseAmount mevcutsa
+
+AI tarafından yazılan sayı normalize edildikten sonra bu kontrollü değerlerden biriyle
+eşleşiyorsa kabul edilebilir.
+
+Ancak bu yaklaşım kodu gereksiz derecede karmaşık hale getiriyorsa:
+
+- blanket digit ban kaldırılmalı,
+- güçlü prompt kısıtları korunmalı,
+- structured output korunmalı,
+- makul output validation korunmalıdır.
+
+Basitlik PROJECT.md mimari yaklaşımına tercih edilmelidir.
+
+4. AI'ın kendi başına yeni hesaplama yapmasına izin verme.
+
+Prompt kuralları korunmalıdır:
+
+- verilen rakamları değiştirme,
+- yeni rakam üretme,
+- yeniden hesaplama yapma,
+- yalnızca backend özetini kullan.
+
+5. Yatırım tavsiyesi güvenlik kontrollerini koru.
+
+Şunları engelleyen mevcut yaklaşım devam etmelidir:
+
+- yatırım yap
+- hisse öner
+- kripto öner
+- fon öner
+- satın alma yönlendirmesi
+- ödeme/para transferi talimatı
+
+Ancak forbidden phrase yaklaşımını gereksiz şekilde genişletme.
+
+6. 1200 karakter maksimum uzunluk kontrolünü koru.
+
+Bu revizyonda 1200 karakter kararını değiştirme.
+
+7. Empty-data davranışını değiştirme.
+
+TotalIncome = 0 ve TotalExpense = 0 olduğunda:
+
+- AI çağrısı yapılmamalı.
+- mevcut deterministik "yeterli finansal veri bulunmuyor" davranışı korunmalıdır.
+
+8. DashboardService'i değiştirme.
+
+DashboardService finansal hesapların tek doğruluk kaynağı olmaya devam etmelidir.
+
+AI service içinde finansal hesapları yeniden oluşturma.
+
+9. AI'a gönderilen veri minimizasyonunu değiştirme.
+
+Şunlar yine AI'a gönderilmemelidir:
+
+- UserId
+- Email
+- JWT
+- password/hash
+- ham Expense kayıtları
+- Expense Description listeleri
+- finansal entity listeleri
+
+10. Database davranışını değiştirme.
+
+AI response database'e kaydedilmemelidir.
+
+Expense, Income, Budget veya Bill tablolarında değişiklik yapılmamalıdır.
+
+11. Endpoint sözleşmesini gereksiz şekilde değiştirme.
+
+POST /api/ai/monthly-summary
+
+mevcut davranışı korunmalıdır.
+
+12. Testleri revize et.
+
+Mevcut:
+
+"Analysis içinde herhangi bir rakam varsa reddedilir"
+
+mantığındaki testi kaldır veya yeni doğru davranışa göre değiştir.
+
+En az aşağıdaki testleri ekle/güncelle:
+
+- Backend summary içinde bulunan bir sayısal değer AI analysis içinde kullanıldığında response otomatik olarak reddedilmez.
+- Geçerli bir yüzde değerinin yorumda kullanılması blanket digit kontrolüne takılmaz.
+- Geçerli bir tutarın yorumda kullanılması blanket digit kontrolüne takılmaz.
+- AI'ın structured response validation'ı korunur.
+- Boş analysis reddedilmeye devam eder.
+- Aşırı uzun analysis reddedilmeye devam eder.
+- Investment advice/yasaklı yönlendirme reddedilmeye devam eder.
+- Empty data durumunda AI çağrısı hâlâ yapılmaz.
+- DashboardService hâlâ tek finansal veri kaynağıdır.
+- Database değişmezliği korunur.
+- AI kategorileme ve tüm önceki testler geçmeye devam eder.
+
+Eğer allowed-number doğrulaması uygulandıysa ayrıca:
+
+- Backend summary içinde bulunan sayı kabul edilir.
+- Backend summary içinde bulunmayan açıkça uydurulmuş sayı reddedilir.
+- Decimal ve yüzde formatlarının temel normalize senaryoları test edilir.
+
+Ancak karmaşık veya kırılgan doğal dil parser sistemi oluşturma.
+
+## Çok Önemli
+
+Bu revizyonun amacı güvenliği azaltmak değildir.
+
+Amaç:
+
+"AI hiçbir rakam yazamaz"
+
+şeklindeki aşırı kısıtlamayı,
+
+"AI backend tarafından hesaplanmış finansal değerleri yorumlayabilir fakat kendi finansal
+gerçekliğini oluşturamaz"
+
+kuralına dönüştürmektir.
+
+Şunları yapma:
+
+- Dashboard hesaplarını AI'a taşıma.
+- AI'a yeni finansal hesap yaptırma.
+- AI'ın verdiği rakamları source of truth kabul etme.
+- AI response'u database'e kaydetme.
+- Yeni AI özelliği ekleme.
+- Flutter geliştirme.
+- Yeni endpoint oluşturma.
+- Generic Repository ekleme.
+- Unit of Work ekleme.
+- CQRS ekleme.
+- MediatR ekleme.
+- Çoklu AI provider framework oluşturma.
+- Source-of-truth belgelerini değiştirme.
+
+## İş Bitiminde
+
+Şunları raporla:
+
+1. Değiştirilen dosyalar
+2. Önceki blanket numeric ban davranışının tam olarak ne olduğu
+3. Yeni numeric output doğrulama yaklaşımı
+4. Backend tarafından verilen sayıların nasıl ele alındığı
+5. AI'ın yeni sayı uydurma riskine karşı hangi kontrollerin kaldığı
+6. Prompt kurallarının durumu
+7. Yatırım tavsiyesi kontrollerinin durumu
+8. Empty-data davranışının korunup korunmadığı
+9. Database değişmezliği
+10. Güncellenen/eklenen testler
+11. Build sonucu
+12. Toplam test sonucu
+13. Önceki test gruplarının durumu
+14. İnsan tarafından hâlâ kontrol edilmesi gereken noktalar
+
+Bu revizyon dışında yeni özellik geliştirme.

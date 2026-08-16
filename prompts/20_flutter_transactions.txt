@@ -1,0 +1,825 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut Flutter `mobile/` yapısını ve backend Expense, Income, Category ve AI Expense Categorization endpointlerini incele.
+
+Bu görevde yalnızca Flutter İşlemler ekranı ile Expense/Income entegrasyonunu ve AI gider kategori önerisini geliştir.
+
+Mevcut Authentication, ApiClient, secure storage, Dashboard, navigation ve theme yapısını koru.
+
+Bu aşamada Budget CRUD ve Bill CRUD entegrasyonlarına geçme.
+
+## Amaç
+
+Flutter uygulamasındaki İşlemler ekranını gerçek backend verileriyle çalışır hale getirmek.
+
+Kullanıcı:
+
+- gelirlerini görebilmeli,
+- giderlerini görebilmeli,
+- yeni gelir ekleyebilmeli,
+- yeni gider ekleyebilmeli,
+- gider eklerken AI kategori önerisi alabilmeli,
+- gelir/gider kayıtlarını silebilmeli.
+
+AI yalnızca kategori önerisi üretmelidir.
+
+AI otomatik gider oluşturmamalıdır.
+
+---
+
+## 1. Backend sözleşmelerini doğrudan incele
+
+Aşağıdaki backend dosyalarını incele:
+
+- ExpensesController
+- Expense DTO'ları
+- ExpenseService
+- IncomesController
+- Income DTO'ları
+- IncomeService
+- CategoriesController
+- Category DTO'ları
+- AiController
+- CategorizeExpenseRequest
+- CategorizeExpenseResponse
+
+JSON field isimlerini tahmin etme.
+
+Flutter modellerini backend DTO'larıyla birebir uyumlu oluştur.
+
+Backend kodunu değiştirme.
+
+---
+
+## 2. Category modeli ve service
+
+Flutter tarafında backend Category response'una uygun sade model oluştur.
+
+CategoryService oluştur.
+
+Endpoint:
+
+`GET /api/categories`
+
+kullanılmalıdır.
+
+Kategori listesi backend'den alınmalıdır.
+
+Mobil tarafta yeni kategori üretme.
+
+Backend seed kategorileri:
+
+- Market
+- Ulaşım
+- Fatura
+- Eğlence
+- Sağlık
+- Eğitim
+- Kira
+- Diğer
+
+olmakla birlikte UI source of truth olarak backend response'unu kullanmalıdır.
+
+---
+
+## 3. Expense modelleri
+
+Backend sözleşmesine uygun modeller oluştur.
+
+En az:
+
+- CreateExpenseRequest
+- ExpenseResponse / ExpenseListItem eşdeğeri
+
+Create request backend DTO ile birebir uyumlu olmalıdır.
+
+Expected alanlar backend'i okuyarak doğrulanmalıdır.
+
+Bilinen iş kuralları:
+
+- Amount > 0
+- Description zorunlu
+- CategoryId zorunlu
+- Date zorunlu
+- IsAiCategorized mevcut backend alanıdır
+- UserId request'te bulunmaz
+
+---
+
+## 4. Income modelleri
+
+Backend sözleşmesine uygun modeller oluştur.
+
+En az:
+
+- CreateIncomeRequest
+- IncomeResponse / IncomeListItem eşdeğeri
+
+Kurallar:
+
+- Amount > 0
+- Description opsiyonel
+- Date zorunlu
+- UserId request'te bulunmaz
+
+---
+
+## 5. ExpenseService
+
+Flutter tarafında sade ExpenseService oluştur.
+
+Mevcut ApiClient'i kullan.
+
+Endpointler:
+
+- `GET /api/expenses`
+- `POST /api/expenses`
+- `DELETE /api/expenses/{id}`
+
+Backend'de olmayan update/detail davranışı ekleme.
+
+Sorumluluk:
+
+- liste çekme
+- gider oluşturma
+- gider silme
+- response parse
+- kontrollü hata aktarımı
+
+---
+
+## 6. IncomeService
+
+Mevcut ApiClient ile:
+
+- `GET /api/incomes`
+- `POST /api/incomes`
+- `DELETE /api/incomes/{id}`
+
+endpointlerini kullan.
+
+Backend'de olmayan update/detail endpointi ekleme.
+
+---
+
+## 7. AI kategori öneri servisi
+
+Mevcut backend endpointini kullan:
+
+`POST /api/ai/categorize-expense`
+
+Flutter doğrudan OpenAI API'ye bağlanmamalıdır.
+
+OpenAI API key mobile uygulamaya eklenmemelidir.
+
+Request yalnızca backend DTO'nun beklediği alanları göndermelidir.
+
+AI response modeli backend sözleşmesiyle birebir uyumlu olmalıdır.
+
+En az şu alanları doğru ele al:
+
+- Success
+- CategoryId
+- Category
+- Confidence
+- RequiresManualSelection
+- Message
+
+Nullable alanları backend'e göre parse et.
+
+---
+
+## 8. Transactions ekranı
+
+Mevcut placeholder ekranını gerçek data ekranına dönüştür.
+
+Üstte filtreler:
+
+- Tümü
+- Giderler
+- Gelirler
+
+bulunabilir.
+
+İşlem listesinde:
+
+- tür
+- açıklama
+- kategori (gider ise)
+- tarih
+- tutar
+
+gösterilebilir.
+
+Gelir ve gider görsel olarak ayırt edilebilir.
+
+Örneğin:
+
+- gelir → success/green
+- gider → normal veya kontrollü red/text primary
+
+Ancak yalnızca renge güvenme; `Gelir` / `Gider` tipi de anlaşılır olmalıdır.
+
+---
+
+## 9. Expense ve Income listelerini birleştirme
+
+Backend ayrı endpointler döndürdüğü için Flutter iki listeyi alabilir.
+
+Flutter bunları yalnızca presentation amacıyla tek işlem listesinde birleştirebilir.
+
+Bu kabul edilen UI davranışıdır.
+
+Kurallar:
+
+- finansal toplam hesaplama yapma
+- backend Dashboard hesaplarını burada yeniden üretme
+- yalnızca Expense + Income list item'larını ortak presentation modeline dönüştür
+- tarih bazında deterministik sırala
+
+Tercih:
+
+- Date descending
+- gerekli tie-breaker varsa CreatedAt descending
+- sonra Id
+
+Backend listeleri zaten kendi içinde deterministik olabilir; birleşik liste için mobilde presentation sıralaması yapılabilir.
+
+---
+
+## 10. Transactions state
+
+Sade ChangeNotifier/ViewModel yaklaşımı kullanılabilir.
+
+State en az:
+
+- loading
+- error
+- expenses
+- incomes
+- categories
+- selected filter
+- add/delete loading
+
+durumlarını yönetebilir.
+
+Yeni state-management framework ekleme.
+
+---
+
+## 11. İlk yükleme
+
+Transactions ekranı açıldığında:
+
+- Expense listesi
+- Income listesi
+
+yüklenmelidir.
+
+Category listesi ilk gider ekleme akışında veya ekran açılışında yüklenebilir.
+
+Gereksiz tekrar API çağrısı yapma.
+
+---
+
+## 12. Empty state
+
+Hiç income/expense yoksa:
+
+`Henüz işlem kaydın bulunmuyor.`
+
+gibi sade empty state göster.
+
+Altında:
+
+`İşlem Ekle`
+
+aksiyonu bulunabilir.
+
+Fake transaction gösterme.
+
+---
+
+## 13. Add action
+
+İşlemler ekranında belirgin `+` aksiyonu oluştur.
+
+Kullanıcıya iki seçenek sun:
+
+- Gider Ekle
+- Gelir Ekle
+
+Bottom sheet veya sade seçim dialog'u kullanılabilir.
+
+Stitch / DESIGN.md görsel stilini koru.
+
+---
+
+## 14. Gider Ekle ekranı
+
+Gerçek form oluştur.
+
+Alanlar:
+
+- Tutar
+- Açıklama
+- Tarih
+- Kategori
+
+Ayrıca:
+
+- `AI ile Kategori Öner`
+
+butonu.
+
+Form DESIGN.md ile uyumlu olmalıdır.
+
+---
+
+## 15. Gider tutar doğrulaması
+
+UI seviyesinde:
+
+- boş olmamalı
+- sayısal olmalı
+- > 0 olmalı
+
+Türkçe decimal kullanımını sade ve kontrollü ele al.
+
+Ancak nihai validation backend'dir.
+
+Flutter tarafında finansal hassasiyet hesabı yapma.
+
+---
+
+## 16. Gider açıklaması
+
+Description zorunludur.
+
+- Trim uygulanabilir.
+- boş/whitespace reddedilmeli.
+
+AI kategori önerisi de bu açıklama üzerinden yapılmalıdır.
+
+---
+
+## 17. Gider tarihi
+
+Date picker kullan.
+
+Backend DateOnly sözleşmesine uygun format gönder.
+
+Kullanıcının seçtiği tarihi backend'e gönder.
+
+Timezone dönüşümüyle günü yanlış değiştirme.
+
+DateTime UTC conversion kullanıp DateOnly gününü kaydırma.
+
+Sade `yyyy-MM-dd` yaklaşımı backend sözleşmesine uygunsa kullan.
+
+Backend DTO'yu okuyarak doğrula.
+
+---
+
+## 18. Kategori seçimi
+
+Kategoriler backend `GET /api/categories` endpointinden gelmelidir.
+
+Dropdown, bottom sheet veya uygun mobil selector kullan.
+
+Kategori adı UI için gösterilir.
+
+Create Expense request içinde backend'in beklediği CategoryId gönderilir.
+
+AI'ın CategoryId üretmesine izin verme.
+
+---
+
+## 19. AI kategori öneri akışı
+
+Kullanıcı açıklama girdikten sonra:
+
+`AI ile Kategori Öner`
+
+butonuna basar.
+
+Flutter:
+
+`POST /api/ai/categorize-expense`
+
+çağrısı yapar.
+
+Bu çağrı Expense create çağrısından tamamen ayrı kalmalıdır.
+
+---
+
+## 20. AI loading
+
+AI kategorileme çağrısı sırasında:
+
+- yalnızca AI öneri alanı loading olabilir
+- form tamamen kilitlenmemeli
+- double-submit engellenmeli
+
+---
+
+## 21. AI success
+
+Backend:
+
+- Success = true
+- CategoryId mevcut
+- Category mevcut
+
+döndürürse AI öneri kartı göster.
+
+Örneğin:
+
+AI Önerisi
+Market
+
+Confidence mevcutsa küçük ikincil bilgi olarak gösterilebilir.
+
+Confidence yoksa UI bozulmamalıdır.
+
+---
+
+## 22. Kullanıcı onayı
+
+AI önerisi otomatik kategori seçimi olarak kabul edilmemelidir.
+
+Kullanıcıya:
+
+- `Öneriyi Kullan`
+- `Başka Kategori Seç`
+
+aksiyonlarını sun.
+
+`Öneriyi Kullan` seçildiğinde backend'den dönen doğrulanmış CategoryId seçili kategoriye atanabilir.
+
+Bu yalnızca kullanıcı onayı sonrası yapılmalıdır.
+
+---
+
+## 23. IsAiCategorized davranışı
+
+Mevcut backend `CreateExpenseRequest.IsAiCategorized` alanını doğru kullan.
+
+Kurallar:
+
+- Kullanıcı AI önerisini kabul edip aynı AI category seçimiyle kaydederse `true`
+- Kullanıcı manuel kategori seçerse `false`
+
+Kullanıcı AI önerisini önce kabul edip daha sonra kategoriyi manuel değiştirirse `false` olmalıdır.
+
+Mobil state bunu doğru takip etmelidir.
+
+---
+
+## 24. AI failure
+
+Backend:
+
+- Success = false
+- RequiresManualSelection = true
+
+döndürürse:
+
+`AI şu anda kategori öneremedi. Kategoriyi manuel olarak seçebilirsin.`
+
+gibi kullanıcı dostu mesaj göster.
+
+Form kullanılabilir kalmalıdır.
+
+AI hatası Expense create özelliğini bozmamalıdır.
+
+---
+
+## 25. Gider oluşturma
+
+Kullanıcı formu submit ettiğinde:
+
+`POST /api/expenses`
+
+çağrısı yap.
+
+Request yalnızca backend DTO alanlarını içermelidir.
+
+UserId gönderme.
+
+Başarılı oluşturma sonrası:
+
+- ekran kapanabilir
+- Transactions listesi yenilenmeli
+- kullanıcıya kısa success feedback verilebilir
+
+Double-submit engelle.
+
+---
+
+## 26. Gelir Ekle ekranı
+
+Alanlar:
+
+- Tutar
+- Açıklama (opsiyonel)
+- Tarih
+
+AI veya kategori alanı ekleme.
+
+---
+
+## 27. Income Description davranışı
+
+Description:
+
+- null olabilir
+- boş/whitespace ise backend null'a normalize ediyor
+
+Flutter boş input için `null` gönderebilir.
+
+Backend davranışıyla uyumlu ol.
+
+---
+
+## 28. Gelir oluşturma
+
+`POST /api/incomes`
+
+kullan.
+
+UserId gönderme.
+
+Başarılı create sonrası işlem listesini refresh et.
+
+---
+
+## 29. Silme UX
+
+Expense ve Income kayıtları silinebilir.
+
+Kullanıcı delete aksiyonuna bastığında confirmation dialog göster.
+
+Örnek:
+
+`Bu işlem kaydını silmek istediğinizden emin misiniz?`
+
+Butonlar:
+
+- İptal
+- Sil
+
+---
+
+## 30. Expense silme
+
+Endpoint:
+
+`DELETE /api/expenses/{id}`
+
+kullan.
+
+Backend ownership kontrolünü yapmaktadır.
+
+Flutter UserId göndermemelidir.
+
+Başarılı silme sonrası listeyi yenile veya local presentation listesinden güvenli biçimde çıkar.
+
+---
+
+## 31. Income silme
+
+Endpoint:
+
+`DELETE /api/incomes/{id}`
+
+kullan.
+
+Aynı güvenli yaklaşım.
+
+---
+
+## 32. 404 delete davranışı
+
+Delete sırasında 404 gelirse:
+
+teknik ownership detayı gösterme.
+
+Sade mesaj:
+
+`Kayıt bulunamadı veya artık mevcut değil.`
+
+gibi davranış kullanılabilir.
+
+Ardından liste refresh edilebilir.
+
+---
+
+## 33. 409 / validation davranışı
+
+Expense/Income create akışında backend 400 döndürürse mevcut ApiClient hata yaklaşımını kullan.
+
+Raw ProblemDetails veya backend exception class göstermeme.
+
+---
+
+## 34. Pull-to-refresh
+
+Transactions ekranında RefreshIndicator kullan.
+
+Refresh:
+
+- Expense listesi
+- Income listesi
+
+yenilesin.
+
+AI çağrısı yapmasın.
+
+---
+
+## 35. UI para formatı
+
+Para değerlerini DESIGN.md ile tutarlı Türkçe biçimde göster.
+
+Örneğin:
+
+`₺1.250,50`
+
+Formatting presentation işlemidir.
+
+Toplam finansal hesap yapma.
+
+---
+
+## 36. UI tarih formatı
+
+Listelerde:
+
+`16 Ağu 2026`
+
+gibi sade Türkçe gösterim kullanılabilir.
+
+API request formatı backend sözleşmesine göre korunmalıdır.
+
+---
+
+## 37. Güvenlik
+
+- UserId requestlerde bulunmamalıdır.
+- JWT mevcut merkezi ApiClient tarafından eklenmelidir.
+- OpenAI API key mobile'da bulunmamalıdır.
+- Flutter doğrudan OpenAI'a bağlanmamalıdır.
+- AI raw provider response gösterilmemelidir.
+- Password/token loglanmamalıdır.
+- başka kullanıcı ownership mantığı Flutter'da kurulmaya çalışılmamalıdır; backend'e bırakılmalıdır.
+
+---
+
+## 38. Testler
+
+Gerçek backend ve OpenAI ağına bağımlı test oluşturma.
+
+Fake/mock service veya ApiClient kullan.
+
+En az aşağıdaki davranışları test et.
+
+### Transaction list
+
+- Expense ve Income listeleri yükleniyor.
+- Tümü filtresi iki tipi gösteriyor.
+- Giderler filtresi yalnızca gider gösteriyor.
+- Gelirler filtresi yalnızca gelir gösteriyor.
+- Birleşik liste deterministik tarih sırasıyla gösteriliyor.
+- Empty state doğru.
+- Loading state doğru.
+- Error + retry doğru.
+- Pull-to-refresh iki listeyi tekrar çağırıyor.
+
+### Expense create
+
+- Amount boş reddediliyor.
+- Amount 0 reddediliyor.
+- Negatif amount reddediliyor.
+- Description boş reddediliyor.
+- Category seçilmeden submit reddediliyor.
+- Date zorunlu.
+- UserId request'e eklenmiyor.
+- Başarılı create listeyi yeniliyor.
+
+### AI categorization
+
+- AI çağrısı Expense create çağrısından ayrıdır.
+- AI butonu description olmadan uygun validation verir.
+- AI loading yalnızca öneri alanını etkiler.
+- Success category gösterilir.
+- Confidence null olabilir.
+- `Öneriyi Kullan` sonrası CategoryId atanır.
+- AI önerisi kullanıcı onayı olmadan otomatik seçilmez.
+- AI önerisi kabul edilince `IsAiCategorized = true`.
+- Kullanıcı sonradan kategoriyi değiştirince `IsAiCategorized = false`.
+- AI failure manuel kategori seçimini engellemez.
+- AI failure Expense create akışını bozmaz.
+- Double-submit engellenir.
+- Flutter doğrudan OpenAI endpointine çağrı yapmaz.
+
+### Income create
+
+- Amount validation.
+- Description boş olduğunda null request davranışı.
+- Date zorunlu.
+- UserId request'e eklenmez.
+- Başarılı create listeyi yeniler.
+
+### Delete
+
+- Expense delete confirmation.
+- Income delete confirmation.
+- Başarılı delete sonrası kayıt listeden gider.
+- 404 kullanıcı dostu davranır.
+
+39. Mevcut Flutter testlerini koru.
+
+Önceki:
+
+- temel auth testleri
+- Dashboard testleri
+
+geçmeye devam etmelidir.
+
+40. Static analysis / format / build
+
+İş bitiminde çalıştır:
+
+flutter pub get
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+Generated build klasörü nedeniyle `dart format .` problemi biliniyorsa source kapsamı `lib test` kullanılabilir.
+
+## Çok Önemli — Bu Aşamada Yapma
+
+Bu görevde:
+
+- Budget CRUD Flutter entegrasyonu yapma.
+- Bill CRUD Flutter entegrasyonu yapma.
+- Bill trend entegrasyonu yapma.
+- Dashboard backend kodunu değiştirme.
+- Expense backend kodunu değiştirme.
+- Income backend kodunu değiştirme.
+- Category backend kodunu değiştirme.
+- AI backend kodunu değiştirme.
+- Expense update endpointi uydurma.
+- Income update endpointi uydurma.
+- Expense detail endpointi uydurma.
+- Income detail endpointi uydurma.
+- Flutter'da yeni kategori üretme.
+- AI'ın otomatik Expense oluşturmasına izin verme.
+- Finansal toplamları Flutter'da hesaplama.
+- OpenAI API key ekleme.
+- Yeni state management framework ekleme.
+- Premium/subscription ekleme.
+- Notification ekleme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen Flutter dosyaları
+2. Eklenen paket varsa ve nedeni
+3. Category modelleri/service yapısı
+4. Expense modelleri/service yapısı
+5. Income modelleri/service yapısı
+6. AI categorization model/service yapısı
+7. Transactions state yaklaşımı
+8. Expense + Income birleşik liste yaklaşımı
+9. Filtre davranışı
+10. Empty/loading/error davranışları
+11. Gider ekleme formu
+12. Gelir ekleme formu
+13. Category seçim yaklaşımı
+14. AI kategori öneri akışı
+15. Kullanıcı onayı davranışı
+16. IsAiCategorized state davranışı
+17. AI failure fallback
+18. Expense create davranışı
+19. Income create davranışı
+20. Expense/Income delete davranışı
+21. Pull-to-refresh davranışı
+22. Güvenlik kontrolleri
+23. Oluşturulan/güncellenen testler
+24. Önceki Flutter testlerinin durumu
+25. flutter analyze sonucu
+26. flutter test sonucu
+27. Android debug build sonucu
+28. Bilerek geliştirilmemiş özellikler
+29. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

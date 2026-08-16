@@ -1,0 +1,288 @@
+Önce aşağıdaki dosyaları oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- mevcut AI Monthly Summary implementasyonu
+- ilgili testler
+
+Manuel mobil testte gerçek bir AI output problemi bulundu.
+
+## Problem
+
+AI Monthly Summary bazen kullanıcıya ham teknik backend alanlarını gösteriyor.
+
+Örnek gerçek çıktı:
+
+"Önceki aya ilişkin gider değişimi bilgisi yok
+(previousMonthExpenseChangePercent: null)."
+
+Bu kabul edilemez.
+
+Kullanıcı:
+
+- DTO property adı
+- camelCase field adı
+- JSON key
+- null
+- backend/internal terminology
+- raw payload yapısı
+
+görmemelidir.
+
+Bu görev yalnızca AI Monthly Summary çıktısını kullanıcı dostu hale getirmek içindir.
+
+Backend finansal hesaplama mantığını değiştirme.
+Flutter finansal hesaplama ekleme.
+Yeni AI feature ekleme.
+
+---
+
+# 1. Prompt Talimatını Güçlendir
+
+AI monthly summary system/developer promptuna açık kurallar ekle.
+
+Model:
+
+- yalnızca doğal, kullanıcı dostu Türkçe yazmalı
+- JSON alan adlarını kullanıcıya yazmamalı
+- internal field isimlerini yazmamalı
+- camelCase/PascalCase property adlarını yazmamalı
+- "null" ifadesini kullanıcıya yazmamalı
+- "DTO", "payload", "field", "property", "backend" gibi teknik terimler kullanmamalı
+
+Örneğin:
+
+YANLIŞ:
+"previousMonthExpenseChangePercent: null"
+
+DOĞRU:
+"Önceki aya ait karşılaştırma verisi bulunmuyor."
+
+YANLIŞ:
+"highestSpendingCategory = Market"
+
+DOĞRU:
+"En yüksek harcama Market kategorisinde gerçekleşti."
+
+---
+
+# 2. Null / Eksik Veri Anlatımı
+
+Input summary içindeki nullable alanlar AI'ya gönderilebilir ancak model bunları teknik formatta tekrar etmemelidir.
+
+Örneğin:
+
+previousMonthExpenseChangePercent = null
+
+ise doğal ifade:
+
+"Önceki aya ait karşılaştırma verisi bulunmuyor."
+
+veya bu bilgi tamamen atlanabilir.
+
+Null değeri:
+
+- "null"
+- "undefined"
+- "N/A"
+- raw key/value
+
+şeklinde kullanıcıya gösterme.
+
+---
+
+# 3. Backend Output Validation
+
+Sadece prompta güvenme.
+
+AI tarafından dönen `analysis` metninde teknik field leakage olup olmadığını backend tarafında kontrol et.
+
+En az mevcut monthly-summary input DTO/summary alanlarının raw internal adlarını kapsa.
+
+Örnek yasak pattern/ifadeler:
+
+- previousMonthExpenseChangePercent
+- totalIncome
+- totalExpense
+- balance
+- categoryExpenses
+- budgetUsages
+- highestSpendingCategory
+- highestIncreaseCategory
+- lastSixMonthsTrend
+- limitAmount
+- spentAmount
+- usagePercent
+
+Mevcut gerçek internal field isimlerini koddan doğrula.
+
+Ayrıca standalone/raw:
+
+- `null`
+- JSON benzeri `"field": value`
+- `{ ... }`
+
+gibi açık teknik payload sızıntılarını mümkün olduğunca kontrollü şekilde yakala.
+
+Ancak aşırı agresif filtre ile normal Türkçe cümleleri reddetme.
+
+---
+
+# 4. Leakage Tespit Edilirse
+
+AI output teknik field leakage içeriyorsa bunu kullanıcıya aynen döndürme.
+
+Mevcut kontrollü AI failure/fallback yaklaşımını kullan.
+
+Tercihen:
+
+- Success = false
+- kullanıcı dostu Message
+
+veya mevcut contract ne gerektiriyorsa onunla uyumlu güvenli fallback.
+
+Flutter'a raw AI output gönderme.
+
+API contract değiştirme.
+
+---
+
+# 5. Mevcut Sayı Güvenliği Korunacak
+
+Daha önce insan kontrollü olarak eklenen allowedNumbers doğrulamasını bozma.
+
+Özellikle:
+
+- AI yeni sayı uydurmamalı
+- yalnız backend summary'deki izin verilen sayıları kullanabilmeli
+- number normalization davranışı korunmalı
+
+Bu bug fix teknik field leakage içindir.
+
+Mevcut numeric validation'ı kaldırma veya gevşetme.
+
+---
+
+# 6. Kullanıcı Dostu Dil
+
+AI çıktısı kısa ve doğal Türkçe olmalıdır.
+
+Örneğin verilen durum:
+
+- Market toplam giderlerin %100'ü
+- toplam gider 7000
+- önceki ay karşılaştırma verisi yok
+- bütçe 5000
+- harcama 7000
+- kullanım %140
+- durum Exceeded
+
+gibi bir input varsa çıktı şu tarz olabilir:
+
+"Bu ay harcamaların tamamı Market kategorisinde gerçekleşti ve toplam 7.000 TL harcandı. Market için belirlenen 5.000 TL bütçe aşıldı; kullanım oranı %140 oldu. Önceki aya ait yeterli karşılaştırma verisi bulunmuyor."
+
+Bu sadece davranış örneğidir.
+Hard-code etme.
+
+`Exceeded` gibi backend enum değerini mümkünse doğal Türkçe anlat:
+
+"bütçe aşıldı"
+
+Kullanıcıya enum/internal değer gösterme.
+
+---
+
+# 7. Teknik Terim Leakage
+
+Aşağıdaki türde çıktılar kullanıcıya gitmemeli:
+
+- `AlertStatus: Exceeded`
+- `previousMonthExpenseChangePercent`
+- `CategoryExpenses`
+- `null`
+- `BudgetUsage`
+- `DTO`
+- `JSON`
+- `property`
+- `field`
+
+Model bunları üretirse validation/fallback devreye girmelidir.
+
+---
+
+# 8. Testler
+
+Regression testleri ekle.
+
+En az:
+
+1. AI response içinde:
+   `previousMonthExpenseChangePercent: null`
+   varsa response kullanıcıya aynen geçmez.
+
+2. camelCase internal field adı içeren analysis reject/fallback edilir.
+
+3. raw JSON benzeri output reject/fallback edilir.
+
+4. doğal Türkçe:
+   "Önceki aya ait karşılaştırma verisi bulunmuyor."
+   kabul edilir.
+
+5. `null` input alanı bulunması tek başına endpoint failure değildir.
+   AI bunu doğal dilde atlayabilir/anlatabilir.
+
+6. Mevcut allowedNumbers testleri geçmeye devam eder.
+
+7. Normal başarılı AI analysis hâlâ Success=true olabilir.
+
+8. AI failure app'i bozmaz.
+
+---
+
+# 9. Flutter
+
+Flutter tarafında bu teknik çıktıları temizlemek için string replace gibi workaround yapma.
+
+Doğru sınır backend'dir.
+
+Flutter yalnız backend'in güvenli kullanıcı-facing `analysis` metnini göstermeye devam etsin.
+
+Flutter contract değiştirme.
+
+---
+
+# 10. Yapma
+
+- finansal hesaplamayı AI'ya verme
+- numeric validation kaldırma
+- Flutter'da regex temizliği yapma
+- API contract değiştirme
+- yeni endpoint
+- yeni package
+- büyük AI service refactor
+- raw AI text'i kullanıcıya geçirmek
+
+---
+
+# Son Doğrulama
+
+Çalıştır:
+
+dotnet build
+dotnet test
+
+İş bitiminde raporla:
+
+1. Root cause
+2. Promptta yapılan değişiklik
+3. Backend leakage validation yaklaşımı
+4. Yasaklanan internal field örnekleri
+5. Fallback davranışı
+6. Mevcut allowedNumbers güvenliğinin korunduğu
+7. Eklenen regression testler
+8. dotnet build sonucu
+9. dotnet test sonucu
+10. Manuel olarak tekrar denenmesi gereken AI Monthly Summary senaryosu
+
+Bu görev dışında yeni feature/refactor yapma.

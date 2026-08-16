@@ -1,0 +1,457 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut Flutter uygulamasını incele.
+
+Bu görevde SmartBudget AI mobil uygulamasına ilk kullanım tutorial/onboarding deneyimi eklenecek.
+
+Backend değiştirme.
+Database değiştirme.
+Yeni API endpoint oluşturma.
+Yeni Flutter package ekleme.
+
+Mevcut flutter_secure_storage altyapısını mümkün olduğunca yeniden kullan.
+
+# Amaç
+
+SmartBudget AI'yi ilk kez kullanan kullanıcı uygulamaya login olduktan sonra temel ekranların ne işe yaradığını anlamalıdır.
+
+Ayrıca kullanıcı tutorial'ı daha sonra tekrar görmek isterse ana uygulama ekranlarının sağ üst köşesinde bulunan `?` yardım butonundan tekrar açabilmelidir.
+
+---
+
+# 1. İlk Login Tutorial Davranışı
+
+Başarılı login sonrası authenticated MainShell açıldığında:
+
+Eğer ilgili kullanıcı daha önce tutorial'ı görmediyse tutorial otomatik açılmalıdır.
+
+Tutorial daha önce tamamlanmış veya atlanmışsa sonraki loginlerde otomatik açılmamalıdır.
+
+Bu bilgi yalnızca client/device tarafında saklanmalıdır.
+
+Backend'e:
+
+- TutorialSeen
+- OnboardingCompleted
+- benzeri alan
+
+ekleme.
+
+---
+
+# 2. Kullanıcı Bazlı Saklama
+
+Mevcut flutter_secure_storage kullanılabilir.
+
+Tutorial'ın görülme bilgisini mümkün olduğunca kullanıcı bazlı sakla.
+
+Örneğin mevcut authenticated email bilgisi kullanılarak normalize edilmiş bir kullanıcı anahtarıyla:
+
+tutorial_seen_v1_<user>
+
+benzeri internal storage yaklaşımı uygulanabilir.
+
+Ancak:
+
+- password saklama
+- JWT dışındaki hassas veri ekleme
+- backend değişikliği
+
+yapma.
+
+Uygulamada birden fazla farklı kullanıcı login olursa her kullanıcının ilk kullanım deneyimi bağımsız olmalıdır.
+
+Tutorial version key kullan:
+
+v1
+
+Böylece gelecekte tutorial ciddi şekilde değişirse yeni versiyon gösterilebilir.
+
+---
+
+# 3. Tutorial İçeriği
+
+Tutorial kısa ve anlaşılır olmalıdır.
+
+Uzun açıklamalar kullanma.
+
+DESIGN.md stiline uygun kart/full-screen modal/page-view benzeri sade bir yapı kullan.
+
+Tercihen aşağıdaki adımlar:
+
+## Adım 1 — Hoş Geldiniz
+
+Başlık:
+
+"SmartBudget AI'ye Hoş Geldiniz"
+
+Metin:
+
+"Gelirlerinizi, giderlerinizi, bütçelerinizi ve faturalarınızı tek yerden takip edebilirsiniz."
+
+---
+
+## Adım 2 — İşlemler
+
+Başlık:
+
+"Gelir ve Giderlerinizi Ekleyin"
+
+Metin:
+
+"İşlemler bölümünden gelir ve gider kayıtlarınızı ekleyebilir, geçmiş hareketlerinizi görüntüleyebilirsiniz."
+
+---
+
+## Adım 3 — AI Kategori Önerisi
+
+Başlık:
+
+"AI ile Kategori Önerisi"
+
+Metin:
+
+"Gider açıklamanıza göre AI'dan kategori önerisi alabilirsiniz. Öneriyi kabul etmek veya değiştirmek her zaman sizin kontrolünüzdedir."
+
+AI kategoriyi otomatik ve zorunlu seçiyormuş gibi anlatma.
+
+---
+
+## Adım 4 — Bütçeler
+
+Başlık:
+
+"Bütçenizi Kontrol Edin"
+
+Metin:
+
+"Kategorilere aylık bütçe belirleyebilir, harcama oranınızı ve bütçe uyarılarınızı takip edebilirsiniz."
+
+---
+
+## Adım 5 — Faturalar
+
+Başlık:
+
+"Faturalarınızı Takip Edin"
+
+Metin:
+
+"Elektrik, su ve doğalgaz faturalarınızı kaydedebilir ve son 6 aylık tutar ve tüketim trendlerini inceleyebilirsiniz."
+
+AI fatura tahmini gibi olmayan özellikleri anlatma.
+
+---
+
+## Adım 6 — Ana Sayfa ve AI Analizi
+
+Başlık:
+
+"Aylık Durumunuzu Görün"
+
+Metin:
+
+"Ana Sayfa'da gelir, gider, bakiye ve bütçe durumunuzu görebilir; istediğiniz zaman AI aylık harcama analizini çalıştırabilirsiniz."
+
+AI analizinin otomatik çalıştığını söyleme.
+
+---
+
+# 4. Tutorial Kontrolleri
+
+Tutorial içinde:
+
+- Geri
+- İleri
+- Atla
+
+kontrolleri bulunmalıdır.
+
+Son adımda:
+
+"Başla"
+
+veya DESIGN.md diline uygun benzer bir final butonu kullanılabilir.
+
+Davranış:
+
+- Atla -> tutorial kapanır ve bu versiyon görülmüş kabul edilir.
+- Başla/Tamamla -> tutorial kapanır ve görülmüş kabul edilir.
+- Geri -> önceki sayfa.
+- İleri -> sonraki sayfa.
+
+İlk sayfada Geri gerekli değilse gizlenebilir.
+
+Son sayfada İleri yerine Başla göster.
+
+---
+
+# 5. Progress Indicator
+
+Tutorial'ın hangi adımında olduğunu kullanıcı anlayabilmelidir.
+
+Sade bir:
+
+- dot indicator
+veya
+- "2 / 6"
+
+göstergesi kullanılabilir.
+
+Yeni package ekleme.
+
+Flutter'ın mevcut widget'larıyla yap.
+
+---
+
+# 6. Sağ Üst Yardım Butonu
+
+Authenticated uygulamanın ana ekranlarında sağ üstte mevcut boş alana sabit bir yardım butonu ekle.
+
+Icon:
+
+Icons.help_outline
+
+veya görsel olarak daha uygun mevcut Material icon.
+
+Tooltip:
+
+"Yardım"
+
+Buton:
+
+`?`
+
+anlamını açık şekilde taşımalıdır.
+
+Bu buton en az şu ana sekmelerde aynı konumda görünmelidir:
+
+- Ana Sayfa
+- İşlemler
+- Bütçeler
+- Faturalar
+- Profil
+
+Mevcut ekran başlıklarını bozma.
+
+Örneğin:
+
+Ana Sayfa                         ?
+İşlemler                          ?
+Bütçeler                          ?
+Faturalar                         ?
+Profil                            ?
+
+şeklinde tutarlı header kullan.
+
+---
+
+# 7. Yardım Butonunun Davranışı
+
+Sağ üstteki yardım butonuna basıldığında tutorial tekrar açılmalıdır.
+
+Manuel olarak `?` üzerinden açılan tutorial:
+
+- tutorialSeen değerini sıfırlamamalı
+- logout davranışını değiştirmemeli
+- backend çağrısı yapmamalı
+
+Kullanıcı tutorial'ı istediği kadar yeniden açabilmelidir.
+
+---
+
+# 8. İlk Login Tetikleme
+
+Tutorial login ekranının üstünde açılmamalıdır.
+
+Akış:
+
+Login başarılı
+→ MainShell authenticated state
+→ ilk frame/render güvenli şekilde tamamlanır
+→ tutorial görülmemişse tutorial açılır
+
+Build sırasında doğrudan showDialog/showModal çağrısı yaparak Flutter lifecycle problemi oluşturma.
+
+Gerekirse:
+
+WidgetsBinding.instance.addPostFrameCallback
+
+veya mevcut mimariye uygun güvenli yaklaşım kullan.
+
+Tutorial her rebuild'de tekrar tekrar açılmamalıdır.
+
+---
+
+# 9. Register Akışı
+
+Mevcut davranış:
+
+Register
+→ ardından Login
+
+ise bunu değiştirme.
+
+Kullanıcı ilk başarılı authenticated girişinden sonra tutorial görmelidir.
+
+Auth API contract değiştirme.
+
+---
+
+# 10. Logout ve Tekrar Login
+
+Aynı kullanıcı:
+
+Login
+→ tutorial
+→ tamamla
+→ logout
+→ tekrar login
+
+yaptığında tutorial otomatik tekrar açılmamalıdır.
+
+Ancak `?` butonundan manuel açılabilmelidir.
+
+Başka yeni kullanıcı aynı cihazdan login olursa o kullanıcı için tutorial ilk kez otomatik açılmalıdır.
+
+---
+
+# 11. UI / DESIGN
+
+docs/DESIGN.md kurallarını kullan.
+
+Özellikle mevcut:
+
+- primary renkler
+- typography
+- spacing
+- button radius
+- card radius
+
+ile uyumlu olsun.
+
+Tutorial tasarımı uygulamanın geri kalanından farklı görünmesin.
+
+Aşırı animasyon yapma.
+
+Yeni image asset oluşturma zorunluluğu yok.
+
+Emoji kullanma.
+
+---
+
+# 12. Accessibility
+
+Tutorial ve yardım butonunda:
+
+- semantic label
+- tooltip
+
+gibi temel erişilebilirlik davranışlarını koru.
+
+Metin taşmalarına dikkat et.
+
+Küçük Android ekranlarında scroll gerekirse tutorial içeriği taşmamalıdır.
+
+---
+
+# 13. Testler
+
+Regression/widget testleri ekle.
+
+En az aşağıdakileri doğrula:
+
+1. Tutorial görülmemiş kullanıcı authenticated olduğunda tutorial otomatik açılır.
+
+2. Tutorial daha önce görülmüş kullanıcıda otomatik açılmaz.
+
+3. Atla butonu tutorial'ı kapatır ve görülmüş olarak kaydeder.
+
+4. Final Başla/Tamamla butonu görülmüş olarak kaydeder.
+
+5. `?` yardım butonu tutorial'ı manuel açar.
+
+6. Manuel açılan tutorial daha önce görülmüş olsa bile açılır.
+
+7. Logout/login sonrası aynı kullanıcı için otomatik tekrar açılmaz.
+
+8. Farklı kullanıcı için tutorial state bağımsızdır.
+
+9. Tutorial adımlarında İleri/Geri navigation doğru çalışır.
+
+10. Sağ üst yardım butonu en az ana authenticated ekranlarda erişilebilir durumdadır.
+
+Testlerde gerçek backend çağrısı gerektirme.
+Mevcut fake/test infrastructure kullan.
+
+---
+
+# 14. Mevcut Davranışları Bozma
+
+Şunları değiştirme:
+
+- Login/Register API
+- JWT davranışı
+- bottom navigation
+- Dashboard calculations
+- Expense/Income CRUD
+- Budget CRUD
+- Bill CRUD
+- AI categorization
+- AI monthly analysis
+- Profile logout
+- secure JWT storage
+
+Tutorial ayrı bir UI/help concern olarak kalmalıdır.
+
+---
+
+# 15. Yapma
+
+- backend değişikliği
+- migration
+- yeni entity
+- yeni API
+- tutorial verisini PostgreSQL'e yazma
+- analytics
+- telemetry
+- push notification
+- premium
+- subscription
+- sosyal login
+- yeni AI özelliği
+- üçüncü parti onboarding/tutorial package
+- gereksiz architecture refactor
+
+---
+
+# 16. Son Doğrulama
+
+Çalıştır:
+
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+---
+
+# İş Bitiminde Raporla
+
+1. Değiştirilen/eklenen dosyalar
+2. Tutorial UI yapısı
+3. Tutorial'ın ilk login sonrası nasıl tetiklendiği
+4. Kullanıcı bazlı tutorialSeen bilgisinin nasıl saklandığı
+5. `?` yardım butonunun hangi ekranlara eklendiği
+6. Manual reopen davranışı
+7. Logout/login davranışı
+8. Eklenen testler
+9. flutter analyze sonucu
+10. flutter test sonucu
+11. Android debug build sonucu
+12. Manuel cihazda kontrol edilmesi gereken noktalar

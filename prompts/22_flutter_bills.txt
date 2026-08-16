@@ -1,0 +1,886 @@
+Önce aşağıdaki source-of-truth dosyalarını oku:
+
+- PROJECT.md
+- docs/ANALIZ.md
+- docs/TEKNIK_MIMARI_TASLAK.md
+- docs/DESIGN.md
+
+Ardından mevcut Flutter `mobile/` yapısını ve backend Bill + Bill Trend endpoint sözleşmelerini incele.
+
+Bu görevde yalnızca Flutter Bill entegrasyonunu geliştir.
+
+Mevcut Authentication, ApiClient, secure storage, Dashboard, Transactions, Budget, navigation ve theme yapısını koru.
+
+Bu aşamada yeni backend özelliği geliştirme.
+
+## Amaç
+
+Flutter uygulamasındaki Faturalar ekranını gerçek backend Bill endpointleriyle çalışır hale getirmek.
+
+Kullanıcı:
+
+- faturalarını görebilmeli,
+- yeni fatura ekleyebilmeli,
+- fatura silebilmeli,
+- elektrik / su / doğalgaz arasında filtreleme yapabilmeli,
+- son 6 aylık fatura tutarı ve tüketim trendini görebilmelidir.
+
+Flutter:
+
+- fatura toplamlarını yeniden hesaplamamalı,
+- tüketim toplamlarını yeniden hesaplamamalı,
+- gelecek fatura tahmini üretmemeli,
+- AI fatura tahmini yapmamalıdır.
+
+Trend hesaplarının doğruluk kaynağı backend olmalıdır.
+
+---
+
+## 1. Backend sözleşmesini doğrudan incele
+
+Aşağıdaki backend dosyalarını incele:
+
+- BillsController
+- BillService
+- Bill DTO'ları
+- BillTrendResponse
+- BillType enum
+- ilgili validation ve JSON enum configuration
+
+JSON field isimlerini tahmin etme.
+
+Flutter modellerini backend DTO'larıyla birebir uyumlu oluştur.
+
+Backend kodunu değiştirme.
+
+---
+
+## 2. BillType modeli
+
+Backend enum sözleşmesine uygun mobil karşılık oluştur.
+
+Beklenen backend değerleri:
+
+- Electricity
+- Water
+- NaturalGas
+
+UI Türkçe karşılıkları:
+
+- Electricity → Elektrik
+- Water → Su
+- NaturalGas → Doğalgaz
+
+Request'te backend'in beklediği enum string değerini kullan.
+
+UI label ile API value birbirine karıştırılmamalıdır.
+
+Şunları ekleme:
+
+- Internet
+- Other
+- Diğer
+
+---
+
+## 3. ConsumptionUnit
+
+ConsumptionUnit Flutter tarafından kullanıcı girdisi olarak alınmamalıdır.
+
+Backend response'tan gelen değeri göster veya BillType üzerinden yalnızca görsel yardımcı metin olarak kullan.
+
+Beklenen birimler:
+
+- Electricity → kWh
+- Water → m³
+- NaturalGas → m³
+
+Request içinde ConsumptionUnit gönderme.
+
+---
+
+## 4. Bill modelleri
+
+Backend sözleşmesine uygun modeller oluştur.
+
+En az:
+
+- CreateBillRequest
+- BillResponse / BillListItem
+- BillTrendPoint
+
+Known alanlar backend'i okuyarak doğrulanmalı.
+
+Create request beklenen semantik:
+
+- BillType
+- Amount
+- ConsumptionValue nullable
+- BillingDate
+
+UserId bulunmamalıdır.
+
+---
+
+## 5. BillService
+
+Flutter tarafında sade BillService oluştur.
+
+Mevcut ApiClient'i kullan.
+
+Endpointler:
+
+- `GET /api/bills`
+- `GET /api/bills/trends`
+- `POST /api/bills`
+- `DELETE /api/bills/{id}`
+
+Backend'de olmayan:
+
+- update
+- detail
+
+endpointlerini uydurma.
+
+---
+
+## 6. Bill state yaklaşımı
+
+Mevcut sade ChangeNotifier yaklaşımını koru.
+
+Gerekirse:
+
+`BillsViewModel`
+
+oluştur.
+
+State en az:
+
+- loading
+- error
+- bills
+- trend
+- selected bill type filter
+- selected trend bill type
+- create loading
+- delete loading
+
+durumlarını yönetmelidir.
+
+Yeni state-management framework ekleme.
+
+---
+
+## 7. İlk yükleme
+
+Faturalar ekranı açıldığında:
+
+- `GET /api/bills`
+- `GET /api/bills/trends`
+
+çağrıları yapılabilir.
+
+Liste ve trend birbirinden kontrollü şekilde yönetilmelidir.
+
+Trend hatası tüm Bill listesini zorunlu olarak bozmak zorunda değildir.
+
+Mümkünse liste ve trend hata durumlarını birbirinden ayır.
+
+---
+
+## 8. Bill listesi
+
+Liste backend sırasını mümkün olduğunca korumalıdır.
+
+Her Bill kartında:
+
+- Fatura türü
+- Tutar
+- Tüketim varsa tüketim
+- ConsumptionUnit
+- BillingDate
+
+göster.
+
+ConsumptionValue null ise:
+
+`0`
+
+gösterme.
+
+Bunun yerine:
+
+- tüketim alanını gizle
+veya
+- `Tüketim bilgisi yok`
+
+gibi sade UI kullan.
+
+---
+
+## 9. Filtreler
+
+Faturalar ekranında:
+
+- Tümü
+- Elektrik
+- Su
+- Doğalgaz
+
+filtreleri bulunabilir.
+
+Bu filtreleme yalnızca presentation seviyesinde yapılabilir.
+
+Backend'de olmayan payment status filtreleri ekleme.
+
+Şunlar olmamalıdır:
+
+- Ödenmiş
+- Bekleyen
+- İnternet
+- Diğer
+
+---
+
+## 10. Empty state
+
+Hiç Bill yoksa:
+
+`Henüz fatura kaydın bulunmuyor.`
+
+gibi sade empty state göster.
+
+Aksiyon:
+
+`Fatura Ekle`
+
+olabilir.
+
+Fake Bill üretme.
+
+---
+
+## 11. Fatura Ekle ekranı
+
+DESIGN.md ile uyumlu form oluştur.
+
+Alanlar:
+
+- Fatura Türü
+- Tutar
+- Tüketim Miktarı (opsiyonel)
+- Fatura Tarihi
+
+Buton:
+
+`Faturayı Kaydet`
+
+---
+
+## 12. BillType seçimi
+
+Kullanıcı yalnızca:
+
+- Elektrik
+- Su
+- Doğalgaz
+
+seçebilmelidir.
+
+API request'te uygun backend enum string değeri gönderilmelidir.
+
+---
+
+## 13. Amount validation
+
+UI seviyesinde:
+
+- boş olamaz
+- sayısal olmalı
+- > 0
+
+kontrollerini yap.
+
+Mevcut transaction/budget amount parsing yardımcılarını uygun olduğu ölçüde yeniden kullan.
+
+Backend nihai validation kaynağıdır.
+
+---
+
+## 14. ConsumptionValue validation
+
+ConsumptionValue opsiyoneldir.
+
+Alan boşsa request:
+
+`null`
+
+gönderebilir.
+
+Değer girilmişse:
+
+- sayısal
+- > 0
+
+olmalıdır.
+
+0 veya negatif değer UI'da reddedilebilir.
+
+Backend yine nihai validation kaynağıdır.
+
+---
+
+## 15. Consumption unit gösterimi
+
+BillType seçildiğinde formda birim yardımcı metni otomatik gösterilebilir.
+
+Örnek:
+
+Elektrik:
+`Tüketim (kWh)`
+
+Su:
+`Tüketim (m³)`
+
+Doğalgaz:
+`Tüketim (m³)`
+
+Kullanıcı birim seçmemeli veya yazmamalıdır.
+
+---
+
+## 16. BillingDate
+
+Native/mobile date picker yaklaşımı kullan.
+
+Backend DateOnly sözleşmesine uygun tarih gönder.
+
+Timezone dönüşümüyle gün kaydırma yapma.
+
+Backend DTO'yu okuyarak doğru formatı kullan.
+
+---
+
+## 17. Create request
+
+`POST /api/bills`
+
+request yalnızca backend DTO alanlarını içermelidir.
+
+UserId gönderme.
+
+ConsumptionUnit gönderme.
+
+Payment status gönderme.
+
+AI prediction alanı gönderme.
+
+---
+
+## 18. Create success
+
+Başarılı create sonrası:
+
+- form kapanabilir
+- Bill listesi yenilenmeli
+- trend verisi de yenilenmeli
+
+Çünkü yeni Bill trend toplamlarını etkileyebilir.
+
+Flutter trend hesaplaması yapma.
+
+Backend trend endpointini tekrar çağır.
+
+Double-submit engelle.
+
+---
+
+## 19. Bill silme
+
+Bill kartında delete aksiyonu bulunabilir.
+
+Önce confirmation:
+
+`Bu fatura kaydını silmek istediğinizden emin misiniz?`
+
+Butonlar:
+
+- İptal
+- Sil
+
+Endpoint:
+
+`DELETE /api/bills/{id}`
+
+---
+
+## 20. Delete success
+
+Başarılı 204 sonrası:
+
+- Bill listesi güncellenmeli
+- trend endpointi yeniden çağrılmalı
+
+Çünkü silinen Bill aylık toplamları değiştirebilir.
+
+Mobil trend hesabı yapma.
+
+---
+
+## 21. Delete 404
+
+Ownership detayı gösterme.
+
+Sade mesaj:
+
+`Fatura kaydı bulunamadı veya artık mevcut değil.`
+
+gibi davranış kullan.
+
+Liste ve trend tekrar yüklenebilir.
+
+---
+
+## 22. Bill trend response
+
+Backend trend response'unu doğrudan kullan.
+
+Her point en az:
+
+- Year
+- Month
+- BillType
+- TotalAmount
+- TotalConsumption nullable
+- ConsumptionUnit
+
+bilgilerini taşır.
+
+Backend varsayılan olarak 6 ay × 3 BillType = 18 nokta döndürebilir.
+
+Flutter bu yapıyı doğru parse etmelidir.
+
+---
+
+## 23. Trend type seçimi
+
+Trend görünümünde kullanıcı:
+
+- Elektrik
+- Su
+- Doğalgaz
+
+arasında seçim yapabilmelidir.
+
+Seçilen BillType için backend'in döndürdüğü 6 aylık noktaları göster.
+
+Flutter aylık TotalAmount veya TotalConsumption değerlerini yeniden toplama.
+
+Yalnızca response içinden ilgili BillType noktalarını presentation amacıyla filtrele.
+
+---
+
+## 24. Trend sıralaması
+
+Backend response deterministik olsa da seçilen türün trend noktalarını:
+
+- Year ascending
+- Month ascending
+
+kronolojik göstermek presentation seviyesinde kabul edilebilir.
+
+Finansal değerleri değiştirme.
+
+---
+
+## 25. Fatura tutarı trendi
+
+Son 6 aylık `TotalAmount` değerlerini göster.
+
+Bu aşamada ağır chart paketi ekleme.
+
+Dashboard'daki trend yaklaşımına benzer sade UI kullanabilirsin:
+
+- aylık satırlar
+- mini bar
+- sade custom visualization
+
+Ancak backend tutarlarını değiştirme veya normalize ederek yeni finansal sayı üretme.
+
+Görsel bar genişliği ölçeklenebilir; text gerçek tutarı göstermelidir.
+
+---
+
+## 26. Tüketim trendi
+
+`TotalConsumption` değerlerini ayrı bölümde göster.
+
+Tutar ve tüketimi aynı ölçekte tek grafikte birleştirme.
+
+ConsumptionUnit göster.
+
+Örneğin:
+
+Elektrik:
+`245 kWh`
+
+Su:
+`12,5 m³`
+
+NaturalGas:
+`80 m³`
+
+---
+
+## 27. Null TotalConsumption
+
+Backend bir ay/tür için:
+
+`TotalConsumption = null`
+
+döndürebilir.
+
+Bu durumda:
+
+`0`
+
+tüketimmiş gibi gösterme.
+
+Örnek:
+
+`Tüketim verisi yok`
+
+kullanılabilir.
+
+Bu semantik korunmalıdır.
+
+---
+
+## 28. Empty trend noktaları
+
+Backend kayıt olmayan ay/tür için:
+
+- TotalAmount = 0
+- TotalConsumption = null
+
+döndürebilir.
+
+UI bunu hata saymamalıdır.
+
+Ay trend serisinde kalmalıdır.
+
+---
+
+## 29. Kesinlikle AI fatura tahmini ekleme
+
+Backend'de:
+
+- gelecek fatura tutarı tahmini
+- AI Bill prediction
+- gelecekteki tüketim tahmini
+
+bulunmamaktadır.
+
+Stitch tasarımlarında geçmişte görülen:
+
+- `Tahmini Gelecek Fatura`
+- `AI Öngörüsü`
+- `~435 ₺`
+
+gibi alanları Flutter'a taşıma.
+
+Bu görev yalnızca gerçek backend Bill ve trend verilerini kullanmalıdır.
+
+---
+
+## 30. Pull-to-refresh
+
+Faturalar ekranında RefreshIndicator kullan.
+
+Refresh:
+
+- Bill listesini
+- Bill trendlerini
+
+yenilesin.
+
+Başka endpoint çağırma.
+
+---
+
+## 31. Trend error isolation
+
+Trend endpointi hata verirse mümkünse mevcut Bill listesi kullanılabilir kalmalıdır.
+
+Örneğin:
+
+- liste başarıyla gelir
+- trend başarısız olur
+
+durumunda tüm ekranı kapatan global error yerine trend alanında kontrollü:
+
+`Trend verileri şu anda yüklenemedi.`
+
+gibi hata gösterilebilir.
+
+Retry sadece trend endpointini çağırabilir.
+
+Mimariyi gereksiz karmaşıklaştırmadan uygula.
+
+---
+
+## 32. List error
+
+Bill listesi ilk yüklemede başarısız olursa mevcut `ErrorView` yaklaşımını kullan.
+
+Retry yapılabilsin.
+
+---
+
+## 33. 401
+
+Mevcut merkezi ApiClient 401 handling davranışını kullan.
+
+BillsScreen içinde ayrı auth mekanizması yazma.
+
+---
+
+## 34. Para formatı
+
+Amount ve TotalAmount DESIGN.md ile tutarlı Türkçe para formatında gösterilebilir.
+
+Formatting presentation işlemidir.
+
+Flutter aylık toplam hesaplamamalıdır.
+
+---
+
+## 35. Tüketim formatı
+
+Decimal Consumption değerlerini kullanıcı dostu biçimde göster.
+
+Gereksiz trailing zero azaltılabilir.
+
+Örneğin:
+
+`12.5000` → `12,5`
+
+Bu yalnızca display formatting olmalıdır.
+
+Değer hesaplanmamalı veya değiştirilmemelidir.
+
+---
+
+## 36. Tarih / ay formatı
+
+Bill listesinde:
+
+`16 Ağu 2026`
+
+Trendde:
+
+- Mar
+- Nis
+- May
+- Haz
+- Tem
+- Ağu
+
+gibi Türkçe kısa ay isimleri kullanılabilir.
+
+Yeni localization framework ekleme.
+
+---
+
+## 37. Design
+
+docs/DESIGN.md kullan.
+
+Bill kartları sade olmalıdır.
+
+Fatura türü için tutarlı icon yaklaşımı:
+
+- Elektrik
+- Su
+- Doğalgaz
+
+kullanılabilir.
+
+Tek icon ailesi kullan.
+
+---
+
+## 38. Güvenlik
+
+- UserId requestlerde bulunmamalıdır.
+- JWT merkezi ApiClient tarafından eklenmelidir.
+- Ownership backend'e bırakılmalıdır.
+- OpenAI API key mobile'a eklenmemelidir.
+- Flutter doğrudan AI provider'a bağlanmamalıdır.
+- Backend'de olmayan Bill alanları request'e eklenmemelidir.
+- Raw backend exception kullanıcıya gösterilmemelidir.
+
+---
+
+## 39. Testler
+
+Gerçek backend'e bağımlı kırılgan test oluşturma.
+
+Fake/mock service yaklaşımı kullan.
+
+En az aşağıdaki davranışları test et:
+
+### Model / Service
+
+- Electricity parse edilir.
+- Water parse edilir.
+- NaturalGas parse edilir.
+- Bilinmeyen BillType kontrollü ele alınır.
+- Create request UserId içermez.
+- Create request ConsumptionUnit içermez.
+- Null ConsumptionValue doğru serialize edilir.
+- Service doğru list endpointini çağırır.
+- Service doğru trend endpointini çağırır.
+- Service doğru create endpointini çağırır.
+- Service doğru delete endpointini çağırır.
+
+### List
+
+- Loading state.
+- Error + retry.
+- Empty state.
+- Tümü filtresi.
+- Elektrik filtresi.
+- Su filtresi.
+- Doğalgaz filtresi.
+- Null ConsumptionValue `0` olarak gösterilmez.
+- Amount doğru formatlanır.
+- BillingDate doğru gösterilir.
+
+### Create
+
+- BillType zorunlu.
+- Amount boş reddedilir.
+- Amount 0 reddedilir.
+- Negatif Amount reddedilir.
+- ConsumptionValue boş → null.
+- ConsumptionValue 0 reddedilir.
+- Negatif ConsumptionValue reddedilir.
+- Date zorunlu.
+- Electricity request doğru enum value gönderir.
+- Water request doğru enum value gönderir.
+- NaturalGas request doğru enum value gönderir.
+- UserId gönderilmez.
+- ConsumptionUnit gönderilmez.
+- Başarı sonrası Bill listesi refresh olur.
+- Başarı sonrası trend tekrar çağrılır.
+- Double-submit engellenir.
+
+### Delete
+
+- Confirmation gösterilir.
+- Success sonrası Bill listesi güncellenir.
+- Success sonrası trend refresh edilir.
+- 404 güvenli mesaj üretir.
+
+### Trend
+
+- 18 point response parse edilir.
+- Seçilen Electricity için 6 nokta gösterilir.
+- Water için 6 nokta gösterilir.
+- NaturalGas için 6 nokta gösterilir.
+- Kronolojik sıralama.
+- TotalAmount backend değeri aynen kullanılır.
+- TotalConsumption backend değeri aynen kullanılır.
+- Null TotalConsumption `0` yapılmaz.
+- Empty ay point'i korunur.
+- Amount ve consumption ayrı alanlarda gösterilir.
+- Trend error Bill listesini bozmaz.
+- Trend retry yalnızca trendi tekrar çağırır.
+
+### Security / Scope
+
+- AI future Bill prediction yoktur.
+- Internet BillType yoktur.
+- Other BillType yoktur.
+- Payment status yoktur.
+- UserId payloadlarda yoktur.
+
+40. Mevcut Flutter testlerini koru.
+
+Önceki:
+
+- Authentication
+- Dashboard
+- Transactions/Expense/Income/AI Categorization
+- Budget
+
+testleri geçmeye devam etmelidir.
+
+41. Static analysis / format / build
+
+İş bitiminde çalıştır:
+
+flutter pub get
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+
+## Çok Önemli — Bu Aşamada Yapma
+
+Bu görevde:
+
+- backend değiştirme.
+- Bill update endpointi oluşturma.
+- Bill detail endpointi oluşturma.
+- Internet fatura türü ekleme.
+- Other/Diğer fatura türü ekleme.
+- Payment status ekleme.
+- AI future bill prediction ekleme.
+- Flutter'da TotalAmount hesaplama.
+- Flutter'da TotalConsumption hesaplama.
+- trend aggregation yapma.
+- Dashboard trendleriyle Bill trendlerini birleştirme.
+- yeni AI özelliği ekleme.
+- yeni state-management framework ekleme.
+- premium/subscription ekleme.
+- notification ekleme.
+
+## İş Bitiminde
+
+Aşağıdaki bilgileri raporla:
+
+1. Oluşturulan/değiştirilen Flutter dosyaları
+2. Eklenen paket varsa ve nedeni
+3. BillType model/eşleme yaklaşımı
+4. Bill model yapısı
+5. BillService yapısı
+6. Bills state yaklaşımı
+7. Bill list UI
+8. Bill type filtreleri
+9. Null ConsumptionValue UI davranışı
+10. Fatura ekleme formu
+11. ConsumptionUnit yaklaşımı
+12. Create request sözleşmesi
+13. Create sonrası list/trend refresh
+14. Bill delete davranışı
+15. Trend response parse yaklaşımı
+16. 18 point / 6 aylık yapı
+17. Trend type seçim davranışı
+18. TotalAmount gösterimi
+19. TotalConsumption gösterimi
+20. Null TotalConsumption davranışı
+21. Trend error isolation
+22. Pull-to-refresh davranışı
+23. AI future Bill prediction eklenmediğinin doğrulanması
+24. Güvenlik kontrolleri
+25. Oluşturulan/güncellenen testler
+26. Önceki Flutter testlerinin durumu
+27. flutter analyze sonucu
+28. flutter test sonucu
+29. Android debug build sonucu
+30. Bilerek geliştirilmemiş özellikler
+31. İnsan tarafından kontrol edilmesi gereken noktalar
+
+Bu aşamanın dışında yeni özellik geliştirme.

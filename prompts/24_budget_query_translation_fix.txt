@@ -1,0 +1,128 @@
+SmartBudget backend manuel emulator testinde gerçek bir bug bulundu.
+
+Hata:
+
+GET /api/budgets
+
+çağrısında EF Core şu hatayı veriyor:
+
+"The LINQ expression ... OrderByDescending(... new BudgetValue(...).Year) could not be translated."
+
+Stack trace:
+
+BudgetService.GetAllAsync(...)
+BudgetService.cs line 75
+
+Sorunun nedeni:
+Budget listesi sorgusunda projection ile oluşturulan BudgetValue nesnesinin Year/Month/Category gibi alanları üzerinden OrderBy uygulanıyor ve Npgsql/EF Core sorguyu SQL'e çeviremiyor.
+
+Bu görev yalnızca bu gerçek bug'ı minimum değişiklikle düzeltmek içindir.
+
+## Beklenen davranış
+
+GET /api/budgets:
+
+- authenticated kullanıcının bütçelerini döndürmeli
+- hiç bütçe yoksa 200 OK + []
+- sıralama korunmalı:
+
+Year DESC
+Month DESC
+CategoryName ASC
+Id ASC
+
+- SpentAmount aynı user/category/month/year Expense kayıtlarından backend tarafından hesaplanmalı
+- UsagePercent ve AlertStatus mevcut BudgetCalculations mantığını kullanmaya devam etmeli
+- ownership değişmemeli
+- DTO/API sözleşmesi değişmemeli
+
+## Düzeltme yaklaşımı
+
+EF Core tarafından SQL'e çevrilebilen bir sorgu oluştur.
+
+Tercihen:
+
+1. OrderBy işlemini entity / doğrudan SQL'e çevrilebilir alanlarda projection'dan önce uygula.
+
+Örneğin mantıksal olarak:
+
+Budgets
+.Where(UserId...)
+.OrderByDescending(b => b.Year)
+.ThenByDescending(b => b.Month)
+.ThenBy(b => b.Category.Name)
+.ThenBy(b => b.Id)
+.Select(...)
+
+şeklinde SQL-translatable bir yapı kullan.
+
+Ancak mevcut kodu inceleyerek en küçük ve doğru çözümü uygula.
+
+Gereksiz şekilde AsEnumerable/client-side evaluation kullanma.
+Bütün tabloyu memory'ye çekme.
+Yeni repository/abstraction oluşturma.
+Mimari refactor yapma.
+
+## Regression Test
+
+Bu bug mevcut InMemory/unit testlerde görünmemiş olabilir.
+
+Mümkün olan en uygun seviyede regression test ekle.
+
+En azından:
+
+- hiç Budget olmayan user -> boş liste
+- birden fazla Budget -> beklenen sıralama
+- SpentAmount hesaplama davranışı
+
+mevcut testlerde korunmalı.
+
+Eğer gerçek PostgreSQL provider ile translation regression testi mevcut test mimarisi içinde makul şekilde eklenebiliyorsa ekle.
+
+Aksi halde mevcut service testlerini güncelle ve bunun provider-specific integration bug olduğunu raporla.
+
+## Son doğrulama
+
+Çalıştır:
+
+dotnet build
+dotnet test
+
+Sonra development PostgreSQL + çalışan API üzerinde:
+
+GET /api/budgets
+
+çağrısını tekrar doğrula.
+
+Beklenen:
+
+200 OK
+
+Yeni kullanıcı için:
+
+[]
+
+Budget bulunan kullanıcı için sıralı liste.
+
+## Yapma
+
+- endpoint değiştirme
+- DTO değiştirme
+- database schema değiştirme
+- migration oluşturma
+- Flutter kodunu değiştirme
+- yeni feature ekleme
+- büyük refactor
+- client-side financial calculation ekleme
+
+## İş bitiminde raporla
+
+1. Root cause
+2. Değiştirilen dosyalar
+3. Yapılan minimum LINQ düzeltmesi
+4. Eklenen/değiştirilen testler
+5. dotnet build sonucu
+6. dotnet test sonucu
+7. Gerçek PostgreSQL GET /api/budgets sonucu
+8. Yeni kullanıcıda [] sonucu
+9. Bu düzeltmenin mevcut Budget hesaplama/sıralama davranışını değiştirip değiştirmediği

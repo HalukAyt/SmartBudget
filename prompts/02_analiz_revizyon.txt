@@ -1,0 +1,25 @@
+Önce PROJECT.md ve mevcut docs/ANALIZ.md dosyasını oku.
+
+Bu ANALIZ.md ilk AI taslağıdır. İnsan incelemesi sonucunda aşağıdaki noktaların netleştirilmesine karar verildi:
+
+1. Fatura tutarı için "negatif olmayan" kuralı yerine Amount > 0 kullanılmalıdır.
+2. Fatura ConsumptionValue alanı MVP'de opsiyonel olmalıdır.
+3. ConsumptionValue ölçü birimi fatura tipine göre ele alınmalıdır:
+   - Electricity: kWh
+   - Water: m³
+   - NaturalGas: m³
+4. AI confidence değeri için şu aşamada zorunlu kabul eşiği kullanılmayacaktır.
+   Confidence değeri doğrulanmalı ancak kategori kabul kararı sadece valid JSON ve category whitelist kontrolüne bağlı olmalıdır.
+5. Trend grafikleri MVP'de varsayılan olarak son 6 ayı göstermelidir.
+6. Tarih ve aylık raporlama işlemlerinde Europe/Istanbul zaman dilimi esas alınmalıdır.
+7. Kullanıcı parolası minimum 8 karakter olmalıdır.
+8. Splash ekranını zorunlu MVP işlevi olarak değerlendirme; mobil uygulama akışında bulunabilir ancak fonksiyonel gereksinim olarak gösterilmemelidir.
+9. Daha önce belirsiz olarak işaretlenen bu maddeleri ilgili gereksinim, varsayım, kısıt, kabul kriteri ve edge-case bölümlerinde tutarlı şekilde güncelle.
+10. PROJECT.md ile çelişmeyen mevcut bölümleri gereksiz yere yeniden yazma.
+11. Yeni özellik ekleme.
+12. Given / When / Then kabul kriterlerini test edilebilir biçimde koru.
+13. Dokümanın başındaki "ilk AI taslağı" ifadesini kaldırma; bu revizyon da insan denetimi sonrası AI tarafından oluşturulan ikinci sürüm olarak kalacaktır.
+
+Değişiklik sonunda "Revizyon Özeti" başlığı altında yalnızca yapılan değişiklikleri kısa şekilde listele.
+
+Çıktıyı mevcut docs/ANALIZ.md dosyasını güncelleyerek yaz.

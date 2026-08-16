@@ -1,0 +1,13 @@
+bin/
+obj/
+**/bin/
+**/obj/
+.vs/
+.vscode/
+*.user
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
