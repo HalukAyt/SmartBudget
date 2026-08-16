@@ -3735,6 +3735,58 @@ değişmedi, yeni migration oluşturulmadı.
 
 ---
 
+## AI-LOG-033 — AI Aylık Analiz: 15 Saniyelik HTTP Timeout Düzeltmesi
+
+**Tarih:** 16.08.2026
+**Kullanılan AI:** Claude Code
+**Kullanılan Prompt:** `prompts/41_ai_request_timeout_fix.txt`
+
+### Amaç / Problem
+
+Canlı ortamda (gerçek OpenAI API key ile) AI aylık analiz çağrısı test edildiğinde Docker
+loglarında şu davranış gözlendi: istek `POST https://api.openai.com/v1/responses`'a
+başarıyla gönderiliyor, ancak ardından `"AI monthly analysis timed out."` uyarısı
+düşüyor ve kullanıcıya kontrollü fallback mesajı dönüyordu. Kök neden: `AiOptions.
+TimeoutSeconds` default değeri ve `appsettings.json`'daki `AI:TimeoutSeconds` değeri
+15 saniyeydi; gerçek OpenAI Responses API çağrıları (özellikle `json_schema` strict
+formatlı yanıt istenirken) bu süreyi düzenli olarak aşabiliyordu.
+
+### Uygulanan Çözüm
+
+- `backend/SmartBudget.Api/Services/AI/AiOptions.cs`: `TimeoutSeconds` default'u 15 → 60.
+- `backend/SmartBudget.Api/appsettings.json`: `AI:TimeoutSeconds` değeri 15 → 60.
+- `Program.cs`'e dokunulmadı; mevcut `options.TimeoutSeconds is > 0 and <= 120` clamp
+  mantığı değiştirilmeden yeni değeri sorunsuz kabul etti.
+- Mevcut AI fallback/exception handling (`AiMonthlyAnalysisService` içindeki
+  `OperationCanceledException`/genel `Exception` catch blokları) hiç değiştirilmedi;
+  timeout hâlâ olursa davranış aynı kalır (kontrollü fallback, uygulama çökmez).
+
+### İnsan İncelemesi / Kararı
+
+İnsan; mimarinin, OpenAI entegrasyonunun, model/endpoint seçiminin ve secret
+yönetiminin değişmediğini, düzeltmenin yalnızca iki sayısal konfigürasyon değeriyle
+sınırlı kaldığını doğruladı.
+
+### Doğrulama / Test Sonucu
+
+Backend: `dotnet build` 0 hata/0 uyarı — `dotnet test` **292/292 başarılı** (mevcut
+testlerin hiçbiri `TimeoutSeconds`'ın default değerine bağlı olmadığı için yeni test
+eklenmedi; sırf sayı değişti diye gereksiz test yazılmadı). Docker: `docker compose down`
++ `docker compose up --build -d` sonrası `postgres` ve `api` container'ları healthy oldu.
+
+Gerçek OpenAI API key ile canlı doğrulama: yeni bir test kullanıcısı için gelir+gider
+eklenip `POST /api/ai/monthly-summary` iki kez çağrıldı. İlk çağrı ~23 saniyede
+(`success:false`, içerik-güvenlik doğrulamasından — timeout'tan değil — geçemedi),
+ikinci çağrı ~27 saniyede (`success:true`, gerçek AI yorumu döndü) tamamlandı. Her iki
+süre de eski 15 saniyelik limitte kesin olarak timeout'a düşerdi; yeni 60 saniyelik
+limitte ikisi de sorunsuz tamamlandı. Docker loglarında bu doğrulama boyunca
+`"timed out"` ifadesi bir daha görünmedi. Loglara veya çıktıya API key/Bearer token
+içeriği hiçbir noktada yazılmadı. Test verileri (yalnızca bu smoke test için oluşturulan
+kullanıcı) temizlendi; kullanıcının gerçek hesabına dokunulmadı; migration
+oluşturulmadı.
+
+---
+
 ## Final Test Audit — 16.08.2026 Güncellemesi (Recurring Create-Time Realization Fix Sonrası)
 
 Bu bölüm, bir önceki "Final Test Audit" bölümünü (final dokümantasyon/audit görevinin

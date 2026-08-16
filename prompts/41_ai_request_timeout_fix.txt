@@ -1,0 +1,83 @@
+SmartBudget projesinde canlı AI aylık analiz çağrısında timeout problemi tespit ettik.
+
+Gözlem:
+Docker loglarında istek OpenAI Responses API'ye başarıyla gönderiliyor:
+
+POST https://api.openai.com/v1/responses
+
+ancak ardından:
+
+AI monthly analysis timed out.
+
+Mevcut timeout konfigürasyonu:
+- backend/SmartBudget.Api/Services/AI/AiOptions.cs
+  TimeoutSeconds default = 15
+- backend/SmartBudget.Api/appsettings.json
+  "TimeoutSeconds": 15
+
+Program.cs mevcut AI TimeoutSeconds değerini okuyup maksimum 120 saniyeye kadar HttpClient timeout'u olarak uyguluyor. Program.cs yapısını değiştirmeye gerek yok.
+
+Görev:
+
+1. AI timeout değerini 15 saniyeden 60 saniyeye çıkar.
+   - AiOptions.cs default değerini 60 yap.
+   - appsettings.json içindeki TimeoutSeconds değerini 60 yap.
+   - Program.cs'yi gereksiz yere değiştirme.
+
+2. Mevcut AI fallback / exception handling davranışını bozma.
+   Timeout olursa uygulama yine kontrollü fallback dönmeli.
+
+3. Gerekliyse mevcut testleri güncelle veya yeni minimal test ekle.
+   Ancak sırf sayı değişti diye gereksiz test yazma.
+
+4. Backend için:
+   - dotnet build
+   - dotnet test
+   çalıştır ve sonucu raporla.
+
+5. Docker tarafını yeniden build et:
+   docker compose down
+   docker compose up --build -d
+
+6. Container health durumunu kontrol et.
+
+7. Gerçek OpenAI API key zaten .env üzerinden AI__ApiKey olarak container'a aktarılıyor.
+   Secret değerini hiçbir şekilde loglama veya çıktıya yazma.
+
+8. Mümkünse mevcut backend üzerinden AI monthly analysis isteğini doğrula.
+   Docker loglarında artık 15 saniyede timeout olmaması bekleniyor.
+   Gerçek API çağrısı başarısız olursa nedenini loglardan analiz et ancak secret gösterme.
+
+9. Bu değişiklik için:
+   prompts/41_ai_request_timeout_fix.txt
+   dosyasını oluştur ve yaptığımız problemi/çözümü kaydet.
+
+10. docs/AI_CALISMA_GUNLUGU.md dosyasına yeni bir AI log girdisi ekle.
+    Sorun:
+    - AI_API_KEY container'da mevcut
+    - OpenAI /v1/responses isteği gönderiliyor
+    - 15 saniyelik HttpClient timeout nedeniyle aylık analiz fallback'e düşüyordu
+    Çözüm:
+    - timeout 60 saniyeye çıkarıldı
+    - test/build/Docker doğrulaması yapıldı
+
+Önemli:
+- Mimariyi değiştirme.
+- OpenAI entegrasyonunu yeniden yazma.
+- Modeli veya endpoint'i değiştirme.
+- Secret'lara dokunma.
+- Gereksiz refactor yapma.
+- Sadece timeout problemini minimal ve güvenli şekilde çöz.
+
+--------------------------------------------------
+
+Uygulanan Çözüm (Sonuç Özeti)
+
+- `backend/SmartBudget.Api/Services/AI/AiOptions.cs`: `TimeoutSeconds` default değeri 15 -> 60 olarak değiştirildi.
+- `backend/SmartBudget.Api/appsettings.json`: `AI:TimeoutSeconds` değeri 15 -> 60 olarak değiştirildi.
+- `Program.cs` değiştirilmedi; mevcut `options.TimeoutSeconds is > 0 and <= 120` clamp mantığı aynen korundu ve yeni 60 saniyelik değeri sorunsuz kabul etti.
+- Mevcut AI fallback/exception handling (`AiMonthlyAnalysisService.AnalyzeAsync` içindeki `OperationCanceledException`/genel `Exception` catch blokları, `Fallback(...)` çağrıları) hiç değiştirilmedi.
+- Var olan hiçbir test `TimeoutSeconds`'ın default değerine bağlı olmadığı için (ilgili testler kendi `TimeoutSeconds` değerlerini açıkça set ediyor) yeni test eklenmedi; mevcut `dotnet test` paketi (292 test) tamamı geçti.
+- Docker imajı `docker compose down` + `docker compose up --build -d` ile yeniden oluşturuldu; `postgres` ve `api` container'ları healthy oldu.
+- Gerçek OpenAI API key ile canlı `POST /api/ai/monthly-summary` isteği denendi: istek ~23-27 saniyede tamamlandı (eski 15 saniyelik limitte kesinlikle timeout olurdu, yeni 60 saniyelik limitte sorunsuz tamamlandı). Docker loglarında "timed out" ifadesi bir daha görünmedi.
+- Loglara veya çıktıya API key/Bearer token içeriği hiçbir noktada yazılmadı.
