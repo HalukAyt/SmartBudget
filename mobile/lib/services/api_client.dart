@@ -48,23 +48,50 @@ class ApiClient {
 
   UnauthorizedHandler? onUnauthorized;
 
-  Future<Object?> get(String path, {bool requiresAuth = true}) =>
-      _send('GET', path, requiresAuth: requiresAuth);
+  Future<Object?> get(
+    String path, {
+    bool requiresAuth = true,
+    Duration? timeout,
+  }) => _send('GET', path, requiresAuth: requiresAuth, timeout: timeout);
 
-  Future<Object?> post(String path, {Object? body, bool requiresAuth = true}) =>
-      _send('POST', path, body: body, requiresAuth: requiresAuth);
+  Future<Object?> post(
+    String path, {
+    Object? body,
+    bool requiresAuth = true,
+    Duration? timeout,
+  }) => _send(
+    'POST',
+    path,
+    body: body,
+    requiresAuth: requiresAuth,
+    timeout: timeout,
+  );
 
-  Future<Object?> put(String path, {Object? body, bool requiresAuth = true}) =>
-      _send('PUT', path, body: body, requiresAuth: requiresAuth);
+  Future<Object?> put(
+    String path, {
+    Object? body,
+    bool requiresAuth = true,
+    Duration? timeout,
+  }) => _send(
+    'PUT',
+    path,
+    body: body,
+    requiresAuth: requiresAuth,
+    timeout: timeout,
+  );
 
-  Future<Object?> delete(String path, {bool requiresAuth = true}) =>
-      _send('DELETE', path, requiresAuth: requiresAuth);
+  Future<Object?> delete(
+    String path, {
+    bool requiresAuth = true,
+    Duration? timeout,
+  }) => _send('DELETE', path, requiresAuth: requiresAuth, timeout: timeout);
 
   Future<Object?> _send(
     String method,
     String path, {
     Object? body,
     required bool requiresAuth,
+    Duration? timeout,
   }) async {
     final headers = <String, String>{'Accept': 'application/json'};
 
@@ -88,7 +115,7 @@ class ApiClient {
     try {
       final streamedResponse = await _httpClient
           .send(request)
-          .timeout(_timeout);
+          .timeout(timeout ?? _timeout);
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {

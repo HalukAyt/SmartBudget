@@ -1,0 +1,74 @@
+SmartBudget mobil uygulamasında AI aylık analiz için client-side timeout problemi tespit edildi.
+
+Kesin gözlem:
+- Backend AI timeout'u 60 saniyeye çıkarıldı.
+- OpenAI /v1/responses gerçek çağrıları 23.5–28.5 saniyede HTTP 200 dönüyor.
+- Fakat Flutter tarafında:
+  mobile/lib/config/api_config.dart
+  static const Duration timeout = Duration(seconds: 15);
+
+- mobile/lib/services/api_client.dart içinde tüm HTTP çağrıları `.timeout(_timeout)` ile bu 15 saniyelik global timeout'u kullanıyor.
+- Sonuç olarak Flutter 15 saniyede isteği bırakıyor, backend daha sonra OpenAI'dan başarılı 200 alsa bile kullanıcı fallback ekranı görüyor.
+
+Görev:
+
+1. Global API timeout'u 15 saniye olarak KORU.
+   Login, gelir/gider, dashboard vb. normal endpointleri gereksiz yere 60 saniyeye çıkarma.
+
+2. ApiClient yapısını minimal şekilde geliştirerek request bazında opsiyonel timeout override destekle.
+   Örneğin request metoduna nullable Duration? timeout parametresi eklenebilir.
+   Parametre verilmezse mevcut `_timeout` / ApiConfig.timeout kullanılmaya devam etsin.
+
+3. AI endpointleri için daha uzun timeout kullan:
+   - AI gider kategorileme
+   - AI aylık analiz
+   Bu çağrılar için 65 saniye civarında bir client timeout kullan.
+   Backend timeout'u 60 saniye olduğu için mobil backend'den biraz daha uzun beklemeli.
+
+4. Tercihen ApiConfig içinde ayrı bir sabit tanımla:
+   static const Duration aiTimeout = Duration(seconds: 65);
+
+5. Mevcut normal API davranışlarını bozma.
+   Global timeout = 15 saniye kalmalı.
+
+6. Timeout fallback/error handling davranışlarını koru.
+
+7. İlgili Flutter testlerini güncelle/ekle:
+   - normal request default 15s timeout kullanmaya devam ediyor
+   - AI request uzun timeout override kullanıyor
+   Gereksiz büyük refactor yapma.
+
+8. Şunları çalıştır:
+   dart format lib test
+   flutter analyze
+   flutter test
+
+9. Gerekirse debug APK build al.
+
+10. prompts/42_flutter_ai_timeout_fix.txt oluştur.
+
+11. docs/AI_CALISMA_GUNLUGU.md içine yeni kayıt ekle:
+    - backend OpenAI çağrısı 23–28 saniyede 200 dönüyordu
+    - Flutter global 15 saniye timeout nedeniyle response gelmeden request'i kesiyordu
+    - çözüm olarak normal API timeout'u 15 saniyede bırakıldı
+    - yalnız AI çağrılarına 65 saniyelik timeout override eklendi
+
+Önemli:
+- Backend'e dokunma.
+- OpenAI model/endpoint/key ayarlarına dokunma.
+- Global timeout'u 60/65 saniyeye çıkarma.
+- Mimariyi gereksiz yere değiştirme.
+- Secret loglama.
+- Minimal, güvenli çözüm uygula.
+
+--------------------------------------------------
+
+Uygulanan Çözüm (Sonuç Özeti)
+
+- `mobile/lib/config/api_config.dart`: mevcut `timeout` (15s) sabiti değiştirilmeden korundu; yeni bir `aiTimeout = Duration(seconds: 65)` sabiti eklendi.
+- `mobile/lib/services/api_client.dart`: `get`/`post`/`put`/`delete` ve dahili `_send` metotlarına opsiyonel `Duration? timeout` parametresi eklendi. Parametre verilmezse `_send` içinde `timeout ?? _timeout` ile mevcut client default'u (15s) aynen kullanılmaya devam ediyor; verilirse o istek için geçerli olur. `ApiClient`'ın kurucu/instance davranışı ve diğer tüm mantığı değişmedi.
+- `mobile/lib/services/ai_categorization_service.dart`: `POST /api/ai/categorize-expense` çağrısına `timeout: ApiConfig.aiTimeout` eklendi.
+- `mobile/lib/services/dashboard_service.dart`: `POST /api/ai/monthly-summary` çağrısına `timeout: ApiConfig.aiTimeout` eklendi; aynı dosyadaki `GET /api/dashboard/monthly` çağrısı (normal, AI olmayan endpoint) değiştirilmedi, hâlâ varsayılan 15 saniyeyi kullanıyor.
+- Mevcut timeout/fallback hata yönetimi (`ApiClient._send` içindeki `on TimeoutException` bloğu, `ApiException(ApiErrorType.timeout, ...)`) hiç değiştirilmedi.
+- Testler: `test/api_client_test.dart`'a 3 yeni test (ApiConfig sabit değerleri, per-request override'ın client default'unu geçersiz kıldığı, override verilmezse client default'a düşüldüğü); `test/dashboard_service_test.dart`'a 2 yeni test (aylık analiz uzun AI timeout'unu kullanıyor, normal dashboard isteği kullanmıyor); yeni `test/ai_categorization_service_test.dart` dosyasına 1 test (kategorileme uzun AI timeout'unu kullanıyor) eklendi. Testler gerçek 15/65 saniye beklemek yerine, client'ın kendi default'unu kasıtlı olarak çok kısa (30ms) ayarlayıp gecikmeli (150ms) bir mock yanıtla override mekanizmasını doğruluyor — hızlı ve deterministik.
+- `dart format lib test`, `flutter analyze`, `flutter test` (167/167 başarılı) ve `flutter build apk --debug` çalıştırıldı.

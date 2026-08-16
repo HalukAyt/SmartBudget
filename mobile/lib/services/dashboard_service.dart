@@ -1,3 +1,4 @@
+import '../config/api_config.dart';
 import '../models/dashboard_models.dart';
 import 'api_client.dart';
 
@@ -30,7 +31,11 @@ class DashboardService implements DashboardDataService {
     final body = year == null || month == null
         ? <String, Object?>{}
         : <String, Object?>{'year': year, 'month': month};
-    final result = await _apiClient.post('/api/ai/monthly-summary', body: body);
+    final result = await _apiClient.post(
+      '/api/ai/monthly-summary',
+      body: body,
+      timeout: ApiConfig.aiTimeout,
+    );
     return MonthlyAnalysisResponse.fromJson(_readObject(result));
   }
 

@@ -7,4 +7,11 @@ abstract final class ApiConfig {
   );
 
   static const Duration timeout = Duration(seconds: 15);
+
+  /// Used only for AI endpoints (gider kategorileme, aylık analiz). Real
+  /// OpenAI Responses API calls routinely take 20-30s; the backend's own
+  /// HTTP client timeout for these calls is 60s, so the mobile client must
+  /// wait a little longer than that to actually see the backend's response
+  /// instead of giving up first.
+  static const Duration aiTimeout = Duration(seconds: 65);
 }

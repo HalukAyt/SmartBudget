@@ -83,6 +83,62 @@ void main() {
       expect(captured.body, isNot(contains('userId')));
     },
   );
+
+  test(
+    'monthly analysis uses the longer AI timeout, unlike the regular dashboard request',
+    () async {
+      // The client's own default timeout is intentionally tiny; only a
+      // request that overrides it with ApiConfig.aiTimeout can survive the
+      // slow response below.
+      final service = DashboardService(
+        apiClient: ApiClient(
+          baseUrl: 'https://api.example.test',
+          tokenStorage: MemoryTokenStorage()..token = 'jwt-token',
+          timeout: const Duration(milliseconds: 30),
+          httpClient: MockClient((request) async {
+            await Future<void>.delayed(const Duration(milliseconds: 150));
+            return http.Response.bytes(
+              utf8.encode(jsonEncode(_analysisJson())),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }),
+        ),
+      );
+
+      final response = await service.getMonthlyAnalysis();
+
+      expect(response.analysis, 'Kontrollü aylık analiz.');
+    },
+  );
+
+  test(
+    'regular dashboard request does not get the longer AI timeout',
+    () async {
+      final service = DashboardService(
+        apiClient: ApiClient(
+          baseUrl: 'https://api.example.test',
+          tokenStorage: MemoryTokenStorage()..token = 'jwt-token',
+          timeout: const Duration(milliseconds: 30),
+          httpClient: MockClient((request) async {
+            await Future<void>.delayed(const Duration(milliseconds: 150));
+            return http.Response(jsonEncode(_dashboardJson()), 200);
+          }),
+        ),
+      );
+
+      await expectLater(
+        service.getMonthly(),
+        throwsA(
+          isA<ApiException>().having(
+            (error) => error.type,
+            'type',
+            ApiErrorType.timeout,
+          ),
+        ),
+      );
+    },
+  );
 }
 
 DashboardService _service(

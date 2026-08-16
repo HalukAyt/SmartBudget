@@ -1,3 +1,4 @@
+import '../config/api_config.dart';
 import '../models/transaction_models.dart';
 import 'api_client.dart';
 
@@ -16,6 +17,7 @@ class AiCategorizationService implements AiCategorizationDataService {
     final result = await _apiClient.post(
       '/api/ai/categorize-expense',
       body: {'description': description.trim()},
+      timeout: ApiConfig.aiTimeout,
     );
     try {
       return CategorizeExpenseResponse.fromJson(readJsonObject(result));

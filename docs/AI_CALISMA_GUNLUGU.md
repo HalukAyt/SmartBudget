@@ -3787,6 +3787,56 @@ oluşturulmadı.
 
 ---
 
+## AI-LOG-034 — Flutter Client-Side AI Timeout Düzeltmesi (Backend Timeout'u Yakalayamama)
+
+**Tarih:** 17.08.2026
+**Kullanılan AI:** Claude Code
+**Kullanılan Prompt:** `prompts/42_flutter_ai_timeout_fix.txt`
+
+### Amaç / Problem
+
+AI-LOG-033'te backend AI timeout'u 60 saniyeye çıkarılıp gerçek OpenAI çağrılarının
+23–28 saniyede HTTP 200 döndüğü doğrulanmıştı. Ancak Flutter tarafında
+`mobile/lib/config/api_config.dart` içindeki tek global `ApiConfig.timeout` (15 saniye)
+`ApiClient`'ın **tüm** HTTP çağrılarında (`.timeout(_timeout)`) kullanılıyordu. Sonuç
+olarak backend OpenAI'dan başarılı bir yanıt alsa bile, mobil istemci 15 saniyede
+isteği kendiliğinden bırakıyor ve kullanıcı gereksiz yere fallback ekranını görüyordu —
+backend'deki AI-LOG-033 düzeltmesi mobil tarafta hiçbir fayda sağlamıyordu.
+
+### Uygulanan Çözüm
+
+- `ApiConfig`'e mevcut `timeout` (15s) korunarak yeni bir `aiTimeout = Duration(seconds:
+  65)` sabiti eklendi.
+- `ApiClient.get/post/put/delete` ve dahili `_send` metoduna opsiyonel `Duration? timeout`
+  parametresi eklendi; verilmezse `timeout ?? _timeout` ile mevcut 15 saniyelik client
+  default'u aynen kullanılmaya devam ediyor.
+- Yalnızca iki çağrı noktası (`AiCategorizationService.categorize` →
+  `POST /api/ai/categorize-expense`, `DashboardService.getMonthlyAnalysis` →
+  `POST /api/ai/monthly-summary`) yeni `timeout: ApiConfig.aiTimeout` parametresini
+  geçti. Login, gelir/gider, bütçe, fatura, dashboard, recurring gibi normal
+  endpointler dokunulmadan 15 saniyelik global timeout'ta kaldı.
+
+### İnsan İncelemesi / Kararı
+
+İnsan; global timeout'un 15 saniyede kaldığını, AI dışı hiçbir endpoint'in 60/65
+saniyeye çıkarılmadığını, backend'e ve OpenAI model/endpoint/key ayarlarına
+dokunulmadığını, mevcut timeout fallback/hata yönetiminin (`ApiException(ApiErrorType.
+timeout, ...)`) değişmediğini doğruladı.
+
+### Doğrulama / Test Sonucu
+
+`dart format lib test`, `flutter analyze` (temiz) çalıştırıldı. `flutter test`:
+**167/167 başarılı** (161 mevcut + 6 yeni: `api_client_test.dart`'ta 3 — `ApiConfig`
+sabit değerleri, per-request override'ın client default'unu geçersiz kıldığı, override
+verilmezse client default'a düşüldüğü —, `dashboard_service_test.dart`'ta 2 — aylık
+analiz uzun AI timeout'unu kullanıyor, normal dashboard isteği kullanmıyor —, yeni
+`ai_categorization_service_test.dart`'ta 1). Testler gerçek 15/65 saniye beklemek
+yerine client'ın default'unu kasıtlı olarak çok kısa (30ms) ayarlayıp gecikmeli
+(150ms) mock yanıtla override mekanizmasını hızlı ve deterministik biçimde doğruluyor.
+`flutter build apk --debug` başarılı. Backend'e hiç dokunulmadı; migration yok.
+
+---
+
 ## Final Test Audit — 16.08.2026 Güncellemesi (Recurring Create-Time Realization Fix Sonrası)
 
 Bu bölüm, bir önceki "Final Test Audit" bölümünü (final dokümantasyon/audit görevinin
